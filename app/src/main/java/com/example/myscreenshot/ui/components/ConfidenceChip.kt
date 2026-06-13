@@ -13,12 +13,12 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun ConfidenceChip(confidence: String, modifier: Modifier = Modifier) {
     val textColor = when (confidence) {
-        "High confidence" -> MaterialTheme.colorScheme.primary
+        "High confidence" -> MaterialTheme.colorScheme.onPrimaryContainer
         "Review needed" -> MaterialTheme.colorScheme.onTertiaryContainer
         else -> MaterialTheme.colorScheme.onErrorContainer
     }
     val backgroundColor = when (confidence) {
-        "High confidence" -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.38f)
+        "High confidence" -> MaterialTheme.colorScheme.primaryContainer
         "Review needed" -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.65f)
         else -> MaterialTheme.colorScheme.errorContainer
     }

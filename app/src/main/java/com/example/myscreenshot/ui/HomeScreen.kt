@@ -53,6 +53,7 @@ import com.example.myscreenshot.data.Reminder
 import com.example.myscreenshot.ui.components.FilterChipRow
 import com.example.myscreenshot.ui.components.ReminderCard
 import com.example.myscreenshot.ui.theme.AppCoral
+import com.example.myscreenshot.ui.theme.AppInk
 import com.example.myscreenshot.ui.theme.AppOrange
 import com.example.myscreenshot.ui.theme.MyScreenshotTheme
 import java.time.Instant
@@ -155,7 +156,7 @@ fun HomeContent(
                                 ),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text("SR", color = Color.White, fontWeight = FontWeight.Bold)
+                            Text("SR", color = AppInk, fontWeight = FontWeight.Bold)
                         }
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text("Good morning", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
@@ -237,8 +238,8 @@ private fun WorkspaceCard(reminders: List<Reminder>, onAddManual: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(14.dp, RoundedCornerShape(26.dp), ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f))
-            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(26.dp))
+            .shadow(14.dp, RoundedCornerShape(26.dp), ambientColor = AppInk.copy(alpha = 0.18f))
+            .background(AppInk, RoundedCornerShape(26.dp))
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -290,7 +291,7 @@ private fun WorkspaceCard(reminders: List<Reminder>, onAddManual: () -> Unit) {
                 onClick = onAddManual,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color.White,
-                    contentColor = MaterialTheme.colorScheme.primary,
+                    contentColor = AppInk,
                 ),
                 shape = RoundedCornerShape(16.dp),
                 contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
@@ -304,9 +305,9 @@ private fun WorkspaceCard(reminders: List<Reminder>, onAddManual: () -> Unit) {
 @Composable
 private fun StatBlock(label: String, value: String, caption: String, modifier: Modifier = Modifier) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(label, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f), style = MaterialTheme.typography.labelMedium)
-        Text(value, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.headlineMedium)
-        Text(caption, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f), style = MaterialTheme.typography.bodySmall)
+        Text(label, color = AppInk.copy(alpha = 0.72f), style = MaterialTheme.typography.labelMedium)
+        Text(value, color = AppInk, style = MaterialTheme.typography.headlineMedium)
+        Text(caption, color = AppInk.copy(alpha = 0.74f), style = MaterialTheme.typography.bodySmall)
     }
 }
 

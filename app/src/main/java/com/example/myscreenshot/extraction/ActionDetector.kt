@@ -23,7 +23,7 @@ class ActionDetector {
         val actions = mutableListOf<DetectedAction>()
         detectFlight(cleaned, now, zoneId)?.let(actions::add)
         detectHotel(cleaned, now, zoneId)?.let(actions::add)
-        detectBill(cleaned, now, zoneId)?.let(actions::add)
+        detectBill(cleaned, entities, now, zoneId)?.let(actions::add)
         detectAppointment(cleaned, now, zoneId)?.let(actions::add)
         detectDelivery(cleaned, now, zoneId)?.let(actions::add)
         detectExpiry(cleaned, now, zoneId)?.let(actions::add)
@@ -122,9 +122,12 @@ class ActionDetector {
         )
     }
 
-    private fun detectBill(text: String, now: LocalDateTime, zoneId: ZoneId): DetectedAction? {
-        if (!text.containsAny("due", "payment", "total amount", "amount due", "invoice", "bill", "balance")) return null
+    private fun detectBill(text: String, entities: List<ExtractedEntity>, now: LocalDateTime, zoneId: ZoneId): DetectedAction? {
+        val hasBillKeyword = text.containsAny("due", "payment", "total amount", "amount due", "invoice", "bill", "balance")
+        val hasMoneyEntity = entities.any { it.type == "money" }
+        if (!hasBillKeyword && !hasMoneyEntity) return null
         val money = Regex("\\b(QAR|USD|EUR|GBP|AED|SAR)\\s*([0-9]+(?:[.,][0-9]{2})?)\\b", RegexOption.IGNORE_CASE).find(text)
+        if (!hasBillKeyword && money == null) return null
         val dateTime = findDateTime(text, now, zoneId)
         val amount = money?.groupValues?.getOrNull(2)?.replace(",", ".")?.toDoubleOrNull()
         val currency = money?.groupValues?.getOrNull(1)?.uppercase(Locale.US)
@@ -141,7 +144,7 @@ class ActionDetector {
             amount = amount,
             currency = currency,
             location = null,
-            confidence = confidence(dateTime != null, money != null, text.containsAny("due date", "amount due")),
+            confidence = confidence(dateTime != null, money != null || hasMoneyEntity, text.containsAny("due date", "amount due")),
             reminderSuggestions = listOf(
                 ReminderSuggestion("Reminder 3 days before", 3 * 24 * 60),
                 ReminderSuggestion("Reminder on due date", 0),

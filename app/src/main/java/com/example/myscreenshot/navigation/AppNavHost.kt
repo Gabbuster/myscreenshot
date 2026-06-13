@@ -122,7 +122,12 @@ fun AppNavHost(
                 sharedInput = sharedInput,
                 useSample = false,
                 onBack = goBackOrHome,
-                onSaved = { navController.navigate(Routes.detail(it)) },
+                onSaved = {
+                    navController.navigate(Routes.HOME) {
+                        popUpTo(Routes.HOME) { inclusive = false }
+                        launchSingleTop = true
+                    }
+                },
             )
         }
         composable(Routes.REVIEW_SAMPLE) {
@@ -131,7 +136,12 @@ fun AppNavHost(
                 sharedInput = null,
                 useSample = true,
                 onBack = goBackOrHome,
-                onSaved = { navController.navigate(Routes.detail(it)) },
+                onSaved = {
+                    navController.navigate(Routes.HOME) {
+                        popUpTo(Routes.HOME) { inclusive = false }
+                        launchSingleTop = true
+                    }
+                },
             )
         }
         composable(Routes.SETTINGS) {

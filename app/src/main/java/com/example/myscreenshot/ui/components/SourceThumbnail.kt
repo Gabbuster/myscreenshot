@@ -70,7 +70,7 @@ fun SourceThumbnail(
         } else {
             Text(
                 text = sourceType.take(3).uppercase(),
-                color = MaterialTheme.colorScheme.primary,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Bold,
             )
         }

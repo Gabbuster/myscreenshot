@@ -22,10 +22,6 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -43,7 +39,6 @@ fun SettingsScreen(
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
-    var localOnly by remember { mutableStateOf(true) }
     val notificationsGranted = Build.VERSION.SDK_INT < 33 ||
         ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 
@@ -72,10 +67,10 @@ fun SettingsScreen(
         item {
             SettingsCard {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                    Text("Local processing only")
-                    Switch(checked = localOnly, onCheckedChange = { localOnly = it }, enabled = false)
+                    Text("On-device AI Assist")
+                    Switch(checked = true, onCheckedChange = {}, enabled = false)
                 }
-                Text("Your screenshots stay on this phone. No account. No cloud upload.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("The app reads screenshots with device OCR and local entity detection. Users do not need API keys or accounts.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         item {
@@ -100,8 +95,16 @@ fun SettingsScreen(
         }
         item {
             SettingsCard {
-                Text("Local AI Assist coming soon.", fontWeight = FontWeight.SemiBold)
-                Text("It will improve messy screenshots and still run privately on your phone.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("AI Assist", fontWeight = FontWeight.SemiBold)
+                Text(
+                    "Enabled on this device",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    "The assistant combines OCR, downloaded ML Kit language models, and strict local rules for flights, hotels, bills, deliveries, appointments, and documents.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
         item {

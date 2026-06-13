@@ -20,11 +20,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.myscreenshot.ui.theme.AppCoral
+import com.example.myscreenshot.ui.theme.AppInk
 import com.example.myscreenshot.ui.theme.AppOrange
 import com.example.myscreenshot.ui.theme.MyScreenshotTheme
 
@@ -66,7 +66,7 @@ fun EmptyStateCard(onTrySample: () -> Unit, modifier: Modifier = Modifier) {
                 .background(Brush.linearGradient(listOf(AppOrange, AppCoral)), CircleShape),
             contentAlignment = Alignment.Center,
         ) {
-            Text("+", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+            Text("+", color = AppInk, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         }
         Text("No reminders yet", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Text(

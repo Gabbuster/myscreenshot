@@ -3,7 +3,6 @@ package com.example.myscreenshot.data
 import android.content.Context
 import android.net.Uri
 import com.example.myscreenshot.extraction.DetectedAction
-import com.example.myscreenshot.extraction.ReminderSuggestion
 import com.example.myscreenshot.reminders.ReminderScheduler
 import kotlinx.coroutines.flow.Flow
 import java.io.File
@@ -61,10 +60,24 @@ class AppRepository(context: Context) {
                 createdAt = now,
             ),
         )
-        val alerts = action.reminderSuggestions.toAlerts(id, action.dateTime)
-        database.reminderDao().upsertAlerts(alerts)
-        alerts.forEach { scheduler.schedule(reminder, it) }
         return reminder
+    }
+
+    suspend fun scheduleCustomAlert(
+        reminder: Reminder,
+        alertDateTime: Long,
+        alertLabel: String,
+    ): Boolean {
+        val alert = ReminderAlert(
+            id = UUID.randomUUID().toString(),
+            reminderId = reminder.id,
+            alertDateTime = alertDateTime,
+            alertLabel = alertLabel.ifBlank { reminder.title },
+            isScheduled = false,
+            isTriggered = false,
+        )
+        database.reminderDao().upsertAlerts(listOf(alert))
+        return scheduler.schedule(reminder, alert)
     }
 
     private fun persistSourceImage(sourceUri: String?, sourceType: String, reminderId: String): String? {
@@ -80,19 +93,4 @@ class AppRepository(context: Context) {
         }.getOrDefault(sourceUri)
     }
 
-    private fun List<ReminderSuggestion>.toAlerts(reminderId: String, dateTime: Long?): List<ReminderAlert> {
-        val base = dateTime ?: return emptyList()
-        return mapNotNull { suggestion ->
-            val alertTime = base - suggestion.offsetMinutes * 60_000
-            if (alertTime <= System.currentTimeMillis()) return@mapNotNull null
-            ReminderAlert(
-                id = UUID.randomUUID().toString(),
-                reminderId = reminderId,
-                alertDateTime = alertTime,
-                alertLabel = suggestion.label,
-                isScheduled = false,
-                isTriggered = false,
-            )
-        }
-    }
 }
