@@ -1,0 +1,407 @@
+package com.example.myscreenshot.extraction
+
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.MonthDay
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
+import java.util.Locale
+import java.util.UUID
+
+class ActionDetector {
+    fun detect(
+        text: String,
+        entities: List<ExtractedEntity>,
+        now: LocalDateTime,
+        zoneId: ZoneId,
+    ): List<DetectedAction> {
+        val cleaned = text.trim()
+        if (cleaned.isBlank()) return emptyList()
+
+        val actions = mutableListOf<DetectedAction>()
+        detectFlight(cleaned, now, zoneId)?.let(actions::add)
+        detectHotel(cleaned, now, zoneId)?.let(actions::add)
+        detectBill(cleaned, now, zoneId)?.let(actions::add)
+        detectAppointment(cleaned, now, zoneId)?.let(actions::add)
+        detectDelivery(cleaned, now, zoneId)?.let(actions::add)
+        detectExpiry(cleaned, now, zoneId)?.let(actions::add)
+
+        if (actions.isEmpty()) {
+            detectGeneric(cleaned, now, zoneId)?.let(actions::add)
+        }
+        return actions.distinctBy { it.type + it.title + it.dateTime }
+    }
+
+    private fun detectFlight(text: String, now: LocalDateTime, zoneId: ZoneId): DetectedAction? {
+        val flight = Regex("\\b[A-Z]{2}\\s?\\d{2,4}\\b").find(text)?.value?.replace(" ", "")
+        if (flight == null || !text.containsAny("flight", "departure", "boarding", "booking", "airport")) return null
+        val dateTime = findDateTime(text, now, zoneId)
+        val destination = Regex("\\bto\\s+([A-Za-z ]+)(?:\\s+\\([A-Z]{3}\\))?", RegexOption.IGNORE_CASE)
+            .find(text)?.groupValues?.getOrNull(1)?.trim()?.ifBlank { null }
+        return DetectedAction(
+            id = UUID.randomUUID().toString(),
+            type = "Travel",
+            title = "Flight $flight${destination?.let { " to $it" } ?: ""}",
+            dateTime = dateTime,
+            amount = null,
+            currency = null,
+            location = Regex("([A-Z]{3}\\).+\\([A-Z]{3})").find(text)?.value ?: destination,
+            confidence = confidence(dateTime != null, true, text.containsAny("departure", "booking confirmed")),
+            reminderSuggestions = listOf(
+                ReminderSuggestion("Check-in reminder 24h before", 24 * 60),
+                ReminderSuggestion("Airport reminder 3h before", 3 * 60),
+            ),
+            needsConfirmation = true,
+            rawTextEvidence = text.take(500),
+            calendarEvent = true,
+        )
+    }
+
+    private fun detectHotel(text: String, now: LocalDateTime, zoneId: ZoneId): DetectedAction? {
+        val hasHotelKeyword = text.containsAny("hotel", "resort", "inn", "suites", "accommodation", "room", "guest", "stay")
+        val hasStayKeyword = text.containsAny("check-in", "check in", "arrival", "check-out", "check out", "departure", "nights")
+        if (!hasHotelKeyword && !hasStayKeyword) return null
+
+        val stayDates = findHotelStayDates(text, now.toLocalDate())
+        val checkIn = stayDates.checkIn
+        val nightsCount = Regex("(\\d+)\\s*nights?", RegexOption.IGNORE_CASE).find(text)?.groupValues?.getOrNull(1)?.toLongOrNull()
+        val finalCheckOut = stayDates.checkOut ?: if (checkIn != null && nightsCount != null) checkIn.plusDays(nightsCount) else null
+
+        if (checkIn == null && finalCheckOut == null && !hasHotelKeyword) return null
+
+        val checkInTime = findTimeNear(text, "check") ?: findTimeNear(text, "arrival") ?: LocalTime.of(15, 0)
+        val checkOutTime = findTimeNear(text, "check-out") ?: findTimeNear(text, "checkout") ?: findTimeNear(text, "departure") ?: LocalTime.of(11, 0)
+
+        val dateTime = checkIn?.let { LocalDateTime.of(it, checkInTime).atZone(zoneId).toInstant().toEpochMilli() } ?: findDateTime(text, now, zoneId)
+        val endDateTime = finalCheckOut?.let { LocalDateTime.of(it, checkOutTime).atZone(zoneId).toInstant().toEpochMilli() }
+
+        val nights = nightsCount?.toString()
+            ?: if (checkIn != null && finalCheckOut != null) ChronoUnit.DAYS.between(checkIn, finalCheckOut).coerceAtLeast(1).toString() else null
+
+        val hotelName = findHotelName(text)
+
+        val stayDetails = buildString {
+            if (nights != null) append("$nights nights")
+            if (checkIn != null && finalCheckOut != null) {
+                if (isNotEmpty()) append(" (")
+                append("${checkIn.format(DateTimeFormatter.ofPattern("MMM d"))} - ${finalCheckOut.format(DateTimeFormatter.ofPattern("MMM d"))}")
+                if (isNotEmpty() && nights != null) append(")")
+            }
+        }
+
+        return DetectedAction(
+            id = UUID.randomUUID().toString(),
+            type = "Hotel",
+            title = "Hotel stay: $hotelName",
+            dateTime = dateTime,
+            endDateTime = endDateTime,
+            amount = null,
+            currency = null,
+            location = hotelName,
+            confidence = confidence(dateTime != null, nights != null, true),
+            reminderSuggestions = listOf(
+                ReminderSuggestion("Hotel prep reminder 7 days before", 7 * 24 * 60),
+                ReminderSuggestion("Reminder 1 day before check-in", 24 * 60),
+                ReminderSuggestion("Check-in reminder", 0),
+            ),
+            needsConfirmation = true,
+            rawTextEvidence = text.take(500),
+            calendarEvent = true,
+        ).run {
+            if (stayDetails.isNotBlank()) copy(title = "$title $stayDetails") else this
+        }
+    }
+
+    private fun detectBill(text: String, now: LocalDateTime, zoneId: ZoneId): DetectedAction? {
+        if (!text.containsAny("due", "payment", "total amount", "amount due", "invoice", "bill", "balance")) return null
+        val money = Regex("\\b(QAR|USD|EUR|GBP|AED|SAR)\\s*([0-9]+(?:[.,][0-9]{2})?)\\b", RegexOption.IGNORE_CASE).find(text)
+        val dateTime = findDateTime(text, now, zoneId)
+        return DetectedAction(
+            id = UUID.randomUUID().toString(),
+            type = "Bill",
+            title = Regex("([A-Za-z ]+Bill)").find(text)?.value?.trim() ?: "Bill payment",
+            dateTime = dateTime,
+            amount = money?.groupValues?.getOrNull(2)?.replace(",", ".")?.toDoubleOrNull(),
+            currency = money?.groupValues?.getOrNull(1)?.uppercase(Locale.US),
+            location = null,
+            confidence = confidence(dateTime != null, money != null, text.containsAny("due date", "amount due")),
+            reminderSuggestions = listOf(
+                ReminderSuggestion("Reminder 3 days before", 3 * 24 * 60),
+                ReminderSuggestion("Reminder on due date", 0),
+            ),
+            needsConfirmation = true,
+            rawTextEvidence = text.take(500),
+        )
+    }
+
+    private fun detectAppointment(text: String, now: LocalDateTime, zoneId: ZoneId): DetectedAction? {
+        if (!text.containsAny("doctor", "clinic", "dentist", "hospital", "appointment", "meeting", "consultation", "booking")) return null
+        val dateTime = findDateTime(text, now, zoneId)
+        return DetectedAction(
+            id = UUID.randomUUID().toString(),
+            type = "Appointment",
+            title = Regex("(Doctor|Dentist|Clinic|Hospital|Meeting|Consultation)[A-Za-z ]*", RegexOption.IGNORE_CASE)
+                .find(text)?.value?.trim()?.replaceFirstChar { it.titlecase(Locale.US) } ?: "Appointment",
+            dateTime = dateTime,
+            amount = null,
+            currency = null,
+            location = Regex("([A-Za-z ]+Clinic|[A-Za-z ]+Hospital)", RegexOption.IGNORE_CASE).find(text)?.value?.trim(),
+            confidence = confidence(dateTime != null, text.containsTime(), true),
+            reminderSuggestions = listOf(
+                ReminderSuggestion("Reminder 1 day before", 24 * 60),
+                ReminderSuggestion("Reminder 2 hours before", 2 * 60),
+            ),
+            needsConfirmation = true,
+            rawTextEvidence = text.take(500),
+            calendarEvent = true,
+        )
+    }
+
+    private fun detectDelivery(text: String, now: LocalDateTime, zoneId: ZoneId): DetectedAction? {
+        if (!text.containsAny("delivery", "shipment", "tracking", "expected", "arriving", "dhl", "aramex", "fedex", "ups", "iherb", "amazon")) return null
+        val dateTime = findDateTime(text, now, zoneId)
+        val tracking = Regex("\\b\\d{8,20}\\b").find(text)?.value
+        return DetectedAction(
+            id = UUID.randomUUID().toString(),
+            type = "Delivery",
+            title = Regex("(Delivery|Shipment)( from [A-Za-z0-9 ]+)?", RegexOption.IGNORE_CASE).find(text)?.value ?: "Delivery",
+            dateTime = dateTime,
+            amount = null,
+            currency = null,
+            location = tracking?.let { "Tracking: $it" },
+            confidence = confidence(dateTime != null, tracking != null, true),
+            reminderSuggestions = listOf(ReminderSuggestion("Reminder on delivery day", 0)),
+            needsConfirmation = true,
+            rawTextEvidence = text.take(500),
+        )
+    }
+
+    private fun detectExpiry(text: String, now: LocalDateTime, zoneId: ZoneId): DetectedAction? {
+        if (!text.containsAny("expires", "expiry", "valid until", "warranty", "passport", "visa", "insurance", "residence permit", "driving license")) return null
+        val dateTime = findDateTime(text, now, zoneId)
+        return DetectedAction(
+            id = UUID.randomUUID().toString(),
+            type = "Documents",
+            title = "Document expiry",
+            dateTime = dateTime,
+            amount = null,
+            currency = null,
+            location = null,
+            confidence = confidence(dateTime != null, false, true),
+            reminderSuggestions = listOf(
+                ReminderSuggestion("Reminder 30 days before", 30 * 24 * 60),
+                ReminderSuggestion("Reminder 7 days before", 7 * 24 * 60),
+                ReminderSuggestion("Reminder 1 day before", 24 * 60),
+            ),
+            needsConfirmation = true,
+            rawTextEvidence = text.take(500),
+        )
+    }
+
+    private fun detectGeneric(text: String, now: LocalDateTime, zoneId: ZoneId): DetectedAction? {
+        if (!text.containsAny("remember", "don't forget", "please bring", "submit", "send", "book", "call", "remind me", "tomorrow", "next week")) return null
+        val dateTime = findDateTime(text, now, zoneId)
+        return DetectedAction(
+            id = UUID.randomUUID().toString(),
+            type = "Documents",
+            title = "Review reminder",
+            dateTime = dateTime,
+            amount = null,
+            currency = null,
+            location = null,
+            confidence = if (dateTime == null) "Low confidence" else "Review needed",
+            reminderSuggestions = listOf(ReminderSuggestion("Reminder at selected time", 0)),
+            needsConfirmation = true,
+            rawTextEvidence = text.take(500),
+        )
+    }
+
+    private fun findDateTime(text: String, now: LocalDateTime, zoneId: ZoneId): Long? {
+        val date = findDate(text, now.toLocalDate()) ?: return null
+        val time = findTime(text) ?: LocalTime.of(9, 0)
+        return LocalDateTime.of(date, time).atZone(zoneId).toInstant().toEpochMilli()
+    }
+
+    private fun findTime(text: String): LocalTime? {
+        return Regex("\\b([01]?\\d|2[0-3])[:.]([0-5]\\d)\\b").find(text)?.let {
+            LocalTime.of(it.groupValues[1].toInt(), it.groupValues[2].toInt())
+        }
+    }
+
+    private fun findTimeNear(text: String, keyword: String): LocalTime? {
+        val index = text.indexOf(keyword, ignoreCase = true)
+        if (index < 0) return null
+        val window = text.substring(index, minOf(text.length, index + 80))
+        return findTime(window)
+    }
+
+    private data class HotelStayDates(
+        val checkIn: LocalDate?,
+        val checkOut: LocalDate?,
+    )
+
+    private fun findHotelStayDates(text: String, today: LocalDate): HotelStayDates {
+        val checkIn = findDateNearAny(text, today, "check-in", "check in", "arrival", "from")
+        val checkOut = findDateNearAny(text, today, "check-out", "check out", "checkout", "departure", "to")
+        if (checkIn != null || checkOut != null) return HotelStayDates(checkIn, checkOut)
+
+        findHotelDateRange(text, today)?.let { return it }
+
+        val orderedDates = findAllDatesInTextOrder(text, today)
+        return HotelStayDates(
+            checkIn = orderedDates.firstOrNull(),
+            checkOut = orderedDates.drop(1).firstOrNull(),
+        )
+    }
+
+    private fun findDateNearAny(text: String, today: LocalDate, vararg keywords: String): LocalDate? {
+        keywords.forEach { keyword ->
+            val index = text.indexOf(keyword, ignoreCase = true)
+            if (index >= 0) {
+                val window = text.substring(index, minOf(text.length, index + 110))
+                findAllDatesInTextOrder(window, today).firstOrNull()?.let { return it }
+            }
+        }
+        return null
+    }
+
+    private fun findHotelDateRange(text: String, today: LocalDate): HotelStayDates? {
+        val monthRegex = "(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)"
+
+        Regex("\\b(\\d{1,2})\\s*(?:-|to|until|–|—)\\s*(\\d{1,2})\\s+$monthRegex(?:\\s+(\\d{4}))?\\b", RegexOption.IGNORE_CASE)
+            .find(text)?.let { match ->
+                val month = match.groupValues[3]
+                val year = match.groupValues[4].toIntOrNull() ?: today.year
+                val checkIn = parseMonthDay(match.groupValues[1], month, year, today)
+                val checkOut = parseMonthDay(match.groupValues[2], month, year, today)
+                if (checkIn != null && checkOut != null) return HotelStayDates(checkIn, normalizeCheckout(checkIn, checkOut))
+            }
+
+        Regex("\\b$monthRegex\\s+(\\d{1,2})\\s*(?:-|to|until|–|—)\\s*(\\d{1,2})(?:,)?\\s*(\\d{4})?\\b", RegexOption.IGNORE_CASE)
+            .find(text)?.let { match ->
+                val month = match.groupValues[1]
+                val year = match.groupValues[4].toIntOrNull() ?: today.year
+                val checkIn = parseMonthDay(match.groupValues[2], month, year, today)
+                val checkOut = parseMonthDay(match.groupValues[3], month, year, today)
+                if (checkIn != null && checkOut != null) return HotelStayDates(checkIn, normalizeCheckout(checkIn, checkOut))
+            }
+
+        return null
+    }
+
+    private fun parseMonthDay(day: String, month: String, year: Int, today: LocalDate): LocalDate? {
+        val pattern = if (month.length > 3) "d MMMM yyyy" else "d MMM yyyy"
+        return runCatching {
+            normalizeYear(
+                LocalDate.parse("$day $month $year", DateTimeFormatter.ofPattern(pattern, Locale.ENGLISH)),
+                today,
+            )
+        }.getOrNull()
+    }
+
+    private fun normalizeCheckout(checkIn: LocalDate, checkOut: LocalDate): LocalDate =
+        if (checkOut.isBefore(checkIn) || checkOut == checkIn) checkOut.plusYears(1) else checkOut
+
+    private fun findHotelName(text: String): String {
+        val line = text.lineSequence()
+            .map { it.trim() }
+            .firstOrNull { it.containsAny("hotel", "resort", "inn", "suites", "apartment") && it.length in 4..80 }
+        if (line != null) {
+            return line.replace(Regex("\\b(booking|confirmed|reservation|check-in|check-out)\\b", RegexOption.IGNORE_CASE), "")
+                .trim(' ', '-', ':')
+                .ifBlank { "Hotel" }
+        }
+        return Regex("([A-Z][A-Za-z]+(?:\\s+[A-Z][A-Za-z]+){0,4})\\s+(Hotel|Resort|Inn|Suites|Apartment)", RegexOption.IGNORE_CASE)
+            .find(text)?.value?.trim() ?: "Hotel"
+    }
+
+    private fun findAllDates(text: String, today: LocalDate): List<LocalDate> {
+        return findAllDatesInTextOrder(text, today).distinct().sorted()
+    }
+
+    private fun findAllDatesInTextOrder(text: String, today: LocalDate): List<LocalDate> {
+        val monthRegex = "(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)"
+        val matches = mutableListOf<Pair<Int, LocalDate>>()
+
+        // dd MMMM yyyy
+        Regex("\\b(\\d{1,2})\\s+$monthRegex\\s+(\\d{4})\\b", RegexOption.IGNORE_CASE)
+            .findAll(text).forEach { match ->
+                val day = match.groupValues[1]
+                val month = match.groupValues[2]
+                val year = match.groupValues[3]
+                val f = if (month.length > 3) "d MMMM yyyy" else "d MMM yyyy"
+                runCatching { LocalDate.parse("$day $month $year", DateTimeFormatter.ofPattern(f, Locale.ENGLISH)) }
+                    .getOrNull()?.let { matches.add(match.range.first to it) }
+            }
+
+        // MMMM dd yyyy
+        Regex("\\b$monthRegex\\s+(\\d{1,2})(?:,)?\\s+(\\d{4})\\b", RegexOption.IGNORE_CASE)
+            .findAll(text).forEach { match ->
+                val month = match.groupValues[1]
+                val day = match.groupValues[2]
+                val year = match.groupValues[3]
+                val f = if (month.length > 3) "MMMM d yyyy" else "MMM d yyyy"
+                runCatching { LocalDate.parse("$month $day $year", DateTimeFormatter.ofPattern(f, Locale.ENGLISH)) }
+                    .getOrNull()?.let { matches.add(match.range.first to it) }
+            }
+
+        // dd MMMM (no year following)
+        Regex("\\b(\\d{1,2})\\s+$monthRegex(?!\\s+\\d{4})\\b", RegexOption.IGNORE_CASE)
+            .findAll(text).forEach { match ->
+                val day = match.groupValues[1]
+                val month = match.groupValues[2]
+                val f = if (month.length > 3) "d MMMM" else "d MMM"
+                runCatching { MonthDay.parse("$day $month", DateTimeFormatter.ofPattern(f, Locale.ENGLISH)) }
+                    .getOrNull()?.let { matches.add(match.range.first to normalizeYear(it.atYear(today.year), today)) }
+            }
+
+        // MMMM dd (no year following)
+        Regex("\\b$monthRegex\\s+(\\d{1,2})(?!,?\\s+\\d{4})\\b", RegexOption.IGNORE_CASE)
+            .findAll(text).forEach { match ->
+                val month = match.groupValues[1]
+                val day = match.groupValues[2]
+                val f = if (month.length > 3) "MMMM d" else "MMM d"
+                runCatching { MonthDay.parse("$month $day", DateTimeFormatter.ofPattern(f, Locale.ENGLISH)) }
+                    .getOrNull()?.let { matches.add(match.range.first to normalizeYear(it.atYear(today.year), today)) }
+            }
+
+        // dd/MM/yyyy
+        Regex("\\b(\\d{1,2})[/-](\\d{1,2})[/-](\\d{4})\\b").findAll(text).forEach { match ->
+            val parts = match.value.split('/', '-')
+            runCatching { LocalDate.of(parts[2].toInt(), parts[1].toInt(), parts[0].toInt()) }
+                .getOrNull()?.let { matches.add(match.range.first to it) }
+        }
+
+        // dd/MM (no year following)
+        Regex("\\b(\\d{1,2})[/-](\\d{1,2})(?![/-]\\d{2,4})\\b").findAll(text).forEach { match ->
+            val parts = match.value.split('/', '-')
+            runCatching { LocalDate.of(today.year, parts[1].toInt(), parts[0].toInt()) }
+                .getOrNull()?.let { matches.add(match.range.first to normalizeYear(it, today)) }
+        }
+
+        if (matches.isEmpty()) {
+            if (text.contains("tomorrow", true)) matches.add(0 to today.plusDays(1))
+            if (text.contains("next week", true)) matches.add(0 to today.plusWeeks(1))
+        }
+
+        return matches.sortedBy { it.first }.map { it.second }.distinct()
+    }
+
+    private fun normalizeYear(date: LocalDate, today: LocalDate): LocalDate =
+        if (date.isBefore(today.minusDays(2))) date.plusYears(1) else date
+
+    private fun findDate(text: String, today: LocalDate): LocalDate? = findAllDates(text, today).firstOrNull()
+
+    private fun confidence(hasDate: Boolean, hasDetail: Boolean, strongKeyword: Boolean): String = when {
+        hasDate && hasDetail && strongKeyword -> "High confidence"
+        hasDate || strongKeyword -> "Review needed"
+        else -> "Low confidence"
+    }
+
+    private fun String.containsTime(): Boolean = Regex("\\b([01]?\\d|2[0-3])[:.]([0-5]\\d)\\b").containsMatchIn(this)
+
+    private fun String.containsAny(vararg needles: String): Boolean =
+        needles.any { contains(it, ignoreCase = true) }
+}
