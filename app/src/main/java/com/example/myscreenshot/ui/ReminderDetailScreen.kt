@@ -99,7 +99,7 @@ fun ReminderDetailContent(
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     ReminderTypeIcon(reminder.type)
-                    SourceThumbnail(reminder.sourceType)
+                    SourceThumbnail(reminder.sourceType, sourceUri = reminder.sourceImageUri)
                 }
                 Text(reminder.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                 Text(reminder.type, color = MaterialTheme.colorScheme.primary)

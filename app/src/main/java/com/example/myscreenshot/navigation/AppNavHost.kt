@@ -1,8 +1,34 @@
 package com.example.myscreenshot.navigation
 
+import android.content.Context
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -15,6 +41,7 @@ import com.example.myscreenshot.ui.HomeScreen
 import com.example.myscreenshot.ui.ReminderDetailScreen
 import com.example.myscreenshot.ui.ReviewSaveScreen
 import com.example.myscreenshot.ui.SettingsScreen
+import java.io.File
 
 @Composable
 fun AppNavHost(
@@ -24,9 +51,38 @@ fun AppNavHost(
     onDarkModeChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     val navController = rememberNavController()
     val startDestination = if (initialSharedInput == null) Routes.HOME else Routes.REVIEW
-    val sharedInput = initialSharedInput
+    var sharedInput by remember { mutableStateOf(initialSharedInput) }
+    var showImportSheet by remember { mutableStateOf(false) }
+    var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        sharedInput = SharedInput(
+            uri = uri,
+            text = null,
+            mimeType = context.contentResolver.getType(uri) ?: "image/*",
+        )
+        navController.navigate(Routes.REVIEW) {
+            launchSingleTop = true
+        }
+    }
+    val cameraLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture(),
+    ) { success ->
+        val uri = pendingCameraUri
+        if (success && uri != null) {
+            sharedInput = SharedInput(uri = uri, text = null, mimeType = "image/jpeg")
+            navController.navigate(Routes.REVIEW) {
+                launchSingleTop = true
+            }
+        }
+        pendingCameraUri = null
+    }
     val goBackOrHome = {
         if (!navController.popBackStack()) {
             val currentRoute = navController.currentBackStackEntry?.destination?.route
@@ -43,6 +99,7 @@ fun AppNavHost(
 
     LaunchedEffect(initialSharedInput) {
         if (initialSharedInput != null) {
+            sharedInput = initialSharedInput
             navController.navigate(Routes.REVIEW) {
                 launchSingleTop = true
             }
@@ -56,7 +113,7 @@ fun AppNavHost(
                 onOpenReminder = { navController.navigate(Routes.detail(it)) },
                 onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                 onTrySample = { navController.navigate(Routes.REVIEW_SAMPLE) },
-                onAddManual = { navController.navigate(Routes.REVIEW_SAMPLE) },
+                onAddManual = { showImportSheet = true },
             )
         }
         composable(Routes.REVIEW) {
@@ -98,4 +155,76 @@ fun AppNavHost(
             )
         }
     }
+
+    if (showImportSheet) {
+        ImportImageSheet(
+            onDismiss = { showImportSheet = false },
+            onCamera = {
+                showImportSheet = false
+                val uri = context.createCapturedImageUri()
+                pendingCameraUri = uri
+                cameraLauncher.launch(uri)
+            },
+            onPhotoLibrary = {
+                showImportSheet = false
+                photoPickerLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                )
+            },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ImportImageSheet(
+    onDismiss: () -> Unit,
+    onCamera: () -> Unit,
+    onPhotoLibrary: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("Import screenshot", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text(
+                "Take a new photo or choose an existing image to scan for reminders.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(
+                onClick = onCamera,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                contentPadding = PaddingValues(vertical = 15.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
+            ) {
+                Text("Open camera")
+            }
+            OutlinedButton(
+                onClick = onPhotoLibrary,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                contentPadding = PaddingValues(vertical = 15.dp),
+            ) {
+                Text("Choose from photos")
+            }
+        }
+    }
+}
+
+private fun Context.createCapturedImageUri(): Uri {
+    val imageDir = File(cacheDir, "captured_images").apply { mkdirs() }
+    val imageFile = File.createTempFile("capture_", ".jpg", imageDir)
+    return FileProvider.getUriForFile(
+        this,
+        "$packageName.fileprovider",
+        imageFile,
+    )
 }

@@ -14,14 +14,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -36,6 +39,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.myscreenshot.data.Reminder
 import com.example.myscreenshot.data.AppRepository
 import com.example.myscreenshot.extraction.ActionDetector
 import com.example.myscreenshot.extraction.DetectedAction
@@ -48,6 +52,7 @@ import com.example.myscreenshot.ui.theme.AppCoral
 import com.example.myscreenshot.ui.theme.AppOrange
 import com.example.myscreenshot.ui.theme.MyScreenshotTheme
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 
@@ -61,6 +66,7 @@ fun ReviewSaveScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val activeReminders by repository.observeReminders().collectAsState(initial = emptyList())
     val drafts = remember { mutableStateListOf<ActionDraft>() }
     var extractedText by remember { mutableStateOf("") }
     var sourceType by remember { mutableStateOf(sharedInput?.sourceType ?: "image") }
@@ -70,6 +76,7 @@ fun ReviewSaveScreen(
     var saving by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showDetectedText by remember { mutableStateOf(false) }
+    var duplicateMatches by remember { mutableStateOf<List<DuplicateMatch>>(emptyList()) }
 
     LaunchedEffect(sharedInput, useSample) {
         loading = true
@@ -105,17 +112,47 @@ fun ReviewSaveScreen(
             errorMessage = "No clear reminder action found. You can still try a clearer screenshot or text with a date, amount, flight, bill, or appointment."
         }
         drafts.addAll(
-            detected
+            detected.onlyPlanePropositionForClearTicket(ocr.text)
                 .sortedBy { it.confidence.priority }
                 .map { ActionDraft(it, true, it.title, defaultNotes(it)) },
         )
         loading = false
     }
 
+    fun saveSelectedDrafts(duplicateIdsToDelete: Set<String> = emptySet()) {
+        scope.launch {
+            saving = true
+            runCatching {
+                duplicateIdsToDelete.forEach { repository.deleteReminder(it) }
+                var lastId: String? = null
+                drafts.filter { it.checked }.forEach { draft ->
+                    val reminder = repository.saveAction(
+                        action = draft.action,
+                        title = draft.title,
+                        notes = draft.notes,
+                        sourceType = sourceType,
+                        sourceUri = sourceUri,
+                        ocrText = extractedText,
+                    )
+                    lastId = reminder.id
+                }
+                lastId
+            }.onSuccess { lastId ->
+                saving = false
+                duplicateMatches = emptyList()
+                lastId?.let(onSaved)
+            }.onFailure {
+                saving = false
+                errorMessage = "Could not save this reminder. Please try again."
+            }
+        }
+    }
+
     ReviewSaveContent(
         loading = loading,
         sourceType = sourceType,
         sourceNote = sourceNote,
+        sourceUri = sourceUri,
         errorMessage = errorMessage,
         saving = saving,
         detectedText = extractedText,
@@ -123,29 +160,11 @@ fun ReviewSaveScreen(
         drafts = drafts,
         onBack = onBack,
         onSave = {
-            scope.launch {
-                saving = true
-                runCatching {
-                    var lastId: String? = null
-                    drafts.filter { it.checked }.forEach { draft ->
-                        val reminder = repository.saveAction(
-                            action = draft.action,
-                            title = draft.title,
-                            notes = draft.notes,
-                            sourceType = sourceType,
-                            sourceUri = sourceUri,
-                            ocrText = extractedText,
-                        )
-                        lastId = reminder.id
-                    }
-                    lastId
-                }.onSuccess { lastId ->
-                    saving = false
-                    lastId?.let(onSaved)
-                }.onFailure {
-                    saving = false
-                    errorMessage = "Could not save this reminder. Please try again."
-                }
+            val matches = findDuplicateMatches(drafts.filter { it.checked }, activeReminders)
+            if (matches.isNotEmpty()) {
+                duplicateMatches = matches
+            } else {
+                saveSelectedDrafts()
             }
         },
         onDraftChanged = { index, draft ->
@@ -153,6 +172,17 @@ fun ReviewSaveScreen(
         },
         onToggleDetectedText = { showDetectedText = !showDetectedText },
     )
+
+    if (duplicateMatches.isNotEmpty()) {
+        DuplicateReminderDialog(
+            matches = duplicateMatches,
+            onDismiss = { duplicateMatches = emptyList() },
+            onKeepBoth = { saveSelectedDrafts() },
+            onEraseDuplicate = {
+                saveSelectedDrafts(duplicateMatches.map { it.existing.id }.toSet())
+            },
+        )
+    }
 }
 
 @Composable
@@ -160,6 +190,7 @@ fun ReviewSaveContent(
     loading: Boolean,
     sourceType: String,
     sourceNote: String,
+    sourceUri: String?,
     errorMessage: String?,
     saving: Boolean,
     detectedText: String,
@@ -192,7 +223,7 @@ fun ReviewSaveContent(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                SourceThumbnail(sourceType, modifier = Modifier.height(76.dp))
+                SourceThumbnail(sourceType, modifier = Modifier.height(76.dp), sourceUri = sourceUri)
                 Text("Local capture analysis", color = Color.White, style = MaterialTheme.typography.titleLarge)
                 Text(sourceNote, color = Color.White.copy(alpha = 0.72f))
                 if (loading) {
@@ -231,9 +262,9 @@ fun ReviewSaveContent(
                 checked = draft.checked,
                 title = draft.title,
                 notes = draft.notes,
+                sourceType = sourceType,
+                sourceUri = sourceUri,
                 onCheckedChange = { onDraftChanged(index, draft.copy(checked = it)) },
-                onTitleChange = { onDraftChanged(index, draft.copy(title = it)) },
-                onNotesChange = { onDraftChanged(index, draft.copy(notes = it)) },
             )
         }
         item {
@@ -270,6 +301,42 @@ fun ReviewSaveContent(
     }
 }
 
+@Composable
+private fun DuplicateReminderDialog(
+    matches: List<DuplicateMatch>,
+    onDismiss: () -> Unit,
+    onKeepBoth: () -> Unit,
+    onEraseDuplicate: () -> Unit,
+) {
+    val duplicateNames = matches
+        .map { it.existing.title }
+        .distinct()
+        .take(3)
+        .joinToString("\n") { "Already saved: $it" }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Possible duplicate") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("This looks already saved. Do you want to erase the older duplicate and keep this version?")
+                Text(duplicateNames, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        },
+        confirmButton = {
+            Button(onClick = onEraseDuplicate) {
+                Text("Erase duplicate")
+            }
+        },
+        dismissButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+                OutlinedButton(onClick = onKeepBoth) { Text("Keep both") }
+            }
+        },
+    )
+}
+
 data class ActionDraft(
     val action: DetectedAction,
     val checked: Boolean,
@@ -277,8 +344,66 @@ data class ActionDraft(
     val notes: String,
 )
 
+private data class DuplicateMatch(
+    val draft: ActionDraft,
+    val existing: Reminder,
+)
+
+private fun findDuplicateMatches(drafts: List<ActionDraft>, reminders: List<Reminder>): List<DuplicateMatch> =
+    drafts.mapNotNull { draft ->
+        reminders.firstOrNull { reminder -> reminder.looksLikeDuplicateOf(draft) }
+            ?.let { DuplicateMatch(draft, it) }
+    }
+
+private fun Reminder.looksLikeDuplicateOf(draft: ActionDraft): Boolean {
+    if (!type.equals(draft.action.type, ignoreCase = true)) return false
+    val sameTitle = title.normalizedReminderTitle() == draft.title.normalizedReminderTitle()
+    val sameDate = dateTime?.let { existing ->
+        draft.action.dateTime?.let { incoming -> existing.sameLocalDayAs(incoming) }
+    } == true
+    val sameRouteOrPlace = location?.normalizedReminderTitle()
+        ?.takeIf { it.isNotBlank() }
+        ?.let { existingLocation ->
+            val incomingLocation = draft.action.location?.normalizedReminderTitle().orEmpty()
+            incomingLocation.isNotBlank() &&
+                (incomingLocation.contains(existingLocation) || existingLocation.contains(incomingLocation))
+        } == true
+    return sameTitle || (sameDate && sameRouteOrPlace) || (sameDate && title.importantWordsOverlap(draft.title))
+}
+
+private fun String.normalizedReminderTitle(): String =
+    lowercase()
+        .replace(Regex("[^a-z0-9]+"), " ")
+        .trim()
+
+private fun String.importantWordsOverlap(other: String): Boolean {
+    val left = normalizedReminderTitle().split(" ").filter { it.length >= 3 }.toSet()
+    val right = other.normalizedReminderTitle().split(" ").filter { it.length >= 3 }.toSet()
+    return left.intersect(right).size >= 2
+}
+
+private fun Long.sameLocalDayAs(other: Long): Boolean {
+    val zone = ZoneId.systemDefault()
+    val left = Instant.ofEpochMilli(this).atZone(zone).toLocalDate()
+    val right = Instant.ofEpochMilli(other).atZone(zone).toLocalDate()
+    return left == right
+}
+
 private fun defaultNotes(action: DetectedAction): String =
     action.reminderSuggestions.joinToString("\n") { it.label }
+
+private fun List<DetectedAction>.onlyPlanePropositionForClearTicket(text: String): List<DetectedAction> {
+    val hasTravelAction = any { it.type.equals("Travel", ignoreCase = true) }
+    val clearTicketSignal = text.containsAnyTicketSignal() ||
+        Regex("\\b[A-Z]{2}\\s?\\d{2,4}\\b").containsMatchIn(text) &&
+        Regex("\\b(PNR|booking reference|e-?ticket|ticket number|boarding pass)\\b", RegexOption.IGNORE_CASE).containsMatchIn(text)
+    if (!hasTravelAction || !clearTicketSignal) return this
+    return filter { it.type.equals("Travel", ignoreCase = true) }
+}
+
+private fun String.containsAnyTicketSignal(): Boolean =
+    Regex("\\b(ticket number|e-?ticket|boarding pass|PNR|booking reference|flight number)\\b", RegexOption.IGNORE_CASE)
+        .containsMatchIn(this)
 
 private val String.priority: Int
     get() = when (this) {
@@ -295,6 +420,7 @@ private fun ReviewPreview() {
             loading = false,
             sourceType = "image",
             sourceNote = "Image processed locally",
+            sourceUri = null,
             errorMessage = null,
             saving = false,
             detectedText = Samples.flightText,

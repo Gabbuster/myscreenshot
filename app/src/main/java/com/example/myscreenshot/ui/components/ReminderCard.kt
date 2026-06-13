@@ -34,11 +34,6 @@ fun ReminderCard(
     modifier: Modifier = Modifier,
 ) {
     val isPast = reminder.dateTime?.let { it < System.currentTimeMillis() } == true
-    val confidencePercent = when (reminder.confidence) {
-        "High confidence" -> "95%"
-        "Review needed" -> "78%"
-        else -> "62%"
-    }
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -86,15 +81,11 @@ fun ReminderCard(
             if (isPast) {
                 PassedStamp()
             } else {
-                Box(
-                    modifier = Modifier
-                        .size(52.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(18.dp))
-                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(18.dp)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(confidencePercent, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                }
+                SourceThumbnail(
+                    sourceType = reminder.sourceType,
+                    sourceUri = reminder.sourceImageUri,
+                    modifier = Modifier.size(56.dp),
+                )
             }
         }
     }

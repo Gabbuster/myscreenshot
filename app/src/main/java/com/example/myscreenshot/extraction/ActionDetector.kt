@@ -31,23 +31,33 @@ class ActionDetector {
         if (actions.isEmpty()) {
             detectGeneric(cleaned, now, zoneId)?.let(actions::add)
         }
-        return actions.distinctBy { it.type + it.title + it.dateTime }
+        return actions
+            .suppressWeakNonTravelActionsForClearFlight(cleaned)
+            .distinctBy { it.type + it.title + it.dateTime }
     }
 
     private fun detectFlight(text: String, now: LocalDateTime, zoneId: ZoneId): DetectedAction? {
-        val flight = Regex("\\b[A-Z]{2}\\s?\\d{2,4}\\b").find(text)?.value?.replace(" ", "")
-        if (flight == null || !text.containsAny("flight", "departure", "boarding", "booking", "airport")) return null
+        val flight = text.findFlightNumber() ?: return null
+        if (!text.hasFlightContext()) return null
         val dateTime = findDateTime(text, now, zoneId)
-        val destination = Regex("\\bto\\s+([A-Za-z ]+)(?:\\s+\\([A-Z]{3}\\))?", RegexOption.IGNORE_CASE)
+        val route = findFlightRoute(text)
+        val destination = route?.second ?: Regex("\\bto\\s+([A-Za-z ]+)(?:\\s+\\([A-Z]{3}\\))?", RegexOption.IGNORE_CASE)
             .find(text)?.groupValues?.getOrNull(1)?.trim()?.ifBlank { null }
+        val title = when {
+            route != null -> "Flight from ${route.first} to ${route.second} ($flight)"
+            destination != null -> "Flight to $destination ($flight)"
+            else -> "Flight $flight"
+        }
         return DetectedAction(
             id = UUID.randomUUID().toString(),
             type = "Travel",
-            title = "Flight $flight${destination?.let { " to $it" } ?: ""}",
+            title = title,
             dateTime = dateTime,
             amount = null,
             currency = null,
-            location = Regex("([A-Z]{3}\\).+\\([A-Z]{3})").find(text)?.value ?: destination,
+            location = route?.let { "${it.first} to ${it.second}" }
+                ?: Regex("([A-Z]{3}\\).+\\([A-Z]{3})").find(text)?.value
+                ?: destination,
             confidence = confidence(dateTime != null, true, text.containsAny("departure", "booking confirmed")),
             reminderSuggestions = listOf(
                 ReminderSuggestion("Check-in reminder 24h before", 24 * 60),
@@ -82,19 +92,19 @@ class ActionDetector {
 
         val hotelName = findHotelName(text)
 
-        val stayDetails = buildString {
-            if (nights != null) append("$nights nights")
+        val title = buildString {
+            append("Hotel Stay in $hotelName")
             if (checkIn != null && finalCheckOut != null) {
-                if (isNotEmpty()) append(" (")
-                append("${checkIn.format(DateTimeFormatter.ofPattern("MMM d"))} - ${finalCheckOut.format(DateTimeFormatter.ofPattern("MMM d"))}")
-                if (isNotEmpty() && nights != null) append(")")
+                append(" from ${checkIn.format(shortDateFormatter)} to ${finalCheckOut.format(shortDateFormatter)}")
+            } else if (checkIn != null) {
+                append(" from ${checkIn.format(shortDateFormatter)}")
             }
         }
 
         return DetectedAction(
             id = UUID.randomUUID().toString(),
             type = "Hotel",
-            title = "Hotel stay: $hotelName",
+            title = title,
             dateTime = dateTime,
             endDateTime = endDateTime,
             amount = null,
@@ -109,22 +119,27 @@ class ActionDetector {
             needsConfirmation = true,
             rawTextEvidence = text.take(500),
             calendarEvent = true,
-        ).run {
-            if (stayDetails.isNotBlank()) copy(title = "$title $stayDetails") else this
-        }
+        )
     }
 
     private fun detectBill(text: String, now: LocalDateTime, zoneId: ZoneId): DetectedAction? {
         if (!text.containsAny("due", "payment", "total amount", "amount due", "invoice", "bill", "balance")) return null
         val money = Regex("\\b(QAR|USD|EUR|GBP|AED|SAR)\\s*([0-9]+(?:[.,][0-9]{2})?)\\b", RegexOption.IGNORE_CASE).find(text)
         val dateTime = findDateTime(text, now, zoneId)
+        val amount = money?.groupValues?.getOrNull(2)?.replace(",", ".")?.toDoubleOrNull()
+        val currency = money?.groupValues?.getOrNull(1)?.uppercase(Locale.US)
+        val title = buildString {
+            append("Bill")
+            if (currency != null && amount != null) append(" $currency ${String.format(Locale.US, "%.2f", amount)}")
+            dateTime?.let { append(" due ${formatEpochDate(it, zoneId)}") }
+        }
         return DetectedAction(
             id = UUID.randomUUID().toString(),
             type = "Bill",
-            title = Regex("([A-Za-z ]+Bill)").find(text)?.value?.trim() ?: "Bill payment",
+            title = title,
             dateTime = dateTime,
-            amount = money?.groupValues?.getOrNull(2)?.replace(",", ".")?.toDoubleOrNull(),
-            currency = money?.groupValues?.getOrNull(1)?.uppercase(Locale.US),
+            amount = amount,
+            currency = currency,
             location = null,
             confidence = confidence(dateTime != null, money != null, text.containsAny("due date", "amount due")),
             reminderSuggestions = listOf(
@@ -139,15 +154,22 @@ class ActionDetector {
     private fun detectAppointment(text: String, now: LocalDateTime, zoneId: ZoneId): DetectedAction? {
         if (!text.containsAny("doctor", "clinic", "dentist", "hospital", "appointment", "meeting", "consultation", "booking")) return null
         val dateTime = findDateTime(text, now, zoneId)
+        val place = Regex("([A-Za-z ]+Clinic|[A-Za-z ]+Hospital)", RegexOption.IGNORE_CASE).find(text)?.value?.trim()
+        val appointmentKind = Regex("(Doctor|Dentist|Clinic|Hospital|Meeting|Consultation)[A-Za-z ]*", RegexOption.IGNORE_CASE)
+            .find(text)?.value?.trim()?.replaceFirstChar { it.titlecase(Locale.US) } ?: "Appointment"
+        val title = buildString {
+            append(appointmentKind)
+            place?.let { append(" at $it") }
+            dateTime?.let { append(" on ${formatEpochDate(it, zoneId)}") }
+        }
         return DetectedAction(
             id = UUID.randomUUID().toString(),
             type = "Appointment",
-            title = Regex("(Doctor|Dentist|Clinic|Hospital|Meeting|Consultation)[A-Za-z ]*", RegexOption.IGNORE_CASE)
-                .find(text)?.value?.trim()?.replaceFirstChar { it.titlecase(Locale.US) } ?: "Appointment",
+            title = title,
             dateTime = dateTime,
             amount = null,
             currency = null,
-            location = Regex("([A-Za-z ]+Clinic|[A-Za-z ]+Hospital)", RegexOption.IGNORE_CASE).find(text)?.value?.trim(),
+            location = place,
             confidence = confidence(dateTime != null, text.containsTime(), true),
             reminderSuggestions = listOf(
                 ReminderSuggestion("Reminder 1 day before", 24 * 60),
@@ -163,10 +185,15 @@ class ActionDetector {
         if (!text.containsAny("delivery", "shipment", "tracking", "expected", "arriving", "dhl", "aramex", "fedex", "ups", "iherb", "amazon")) return null
         val dateTime = findDateTime(text, now, zoneId)
         val tracking = Regex("\\b\\d{8,20}\\b").find(text)?.value
+        val title = buildString {
+            append("Delivery")
+            tracking?.let { append(" $it") }
+            dateTime?.let { append(" by ${formatEpochDate(it, zoneId)}") }
+        }
         return DetectedAction(
             id = UUID.randomUUID().toString(),
             type = "Delivery",
-            title = Regex("(Delivery|Shipment)( from [A-Za-z0-9 ]+)?", RegexOption.IGNORE_CASE).find(text)?.value ?: "Delivery",
+            title = title,
             dateTime = dateTime,
             amount = null,
             currency = null,
@@ -181,10 +208,14 @@ class ActionDetector {
     private fun detectExpiry(text: String, now: LocalDateTime, zoneId: ZoneId): DetectedAction? {
         if (!text.containsAny("expires", "expiry", "valid until", "warranty", "passport", "visa", "insurance", "residence permit", "driving license")) return null
         val dateTime = findDateTime(text, now, zoneId)
+        val title = buildString {
+            append("Document expiry")
+            dateTime?.let { append(" on ${formatEpochDate(it, zoneId)}") }
+        }
         return DetectedAction(
             id = UUID.randomUUID().toString(),
             type = "Documents",
-            title = "Document expiry",
+            title = title,
             dateTime = dateTime,
             amount = null,
             currency = null,
@@ -317,6 +348,33 @@ class ActionDetector {
             .find(text)?.value?.trim() ?: "Hotel"
     }
 
+    private fun findFlightRoute(text: String): Pair<String, String>? {
+        val airportPattern = "([A-Za-z][A-Za-z .'-]{1,34})\\s*\\(?([A-Z]{3})\\)?"
+        Regex("$airportPattern\\s+(?:to|→|-)\\s+$airportPattern", RegexOption.IGNORE_CASE)
+            .find(text)?.let { match ->
+                val fromName = match.groupValues[1].cleanPlaceName()
+                val fromCode = match.groupValues[2].uppercase(Locale.US)
+                val toName = match.groupValues[3].cleanPlaceName()
+                val toCode = match.groupValues[4].uppercase(Locale.US)
+                return displayPlace(fromName, fromCode) to displayPlace(toName, toCode)
+            }
+
+        Regex("\\b([A-Z]{3})\\s+(?:to|→|-)\\s+([A-Z]{3})\\b", RegexOption.IGNORE_CASE)
+            .find(text)?.let { match ->
+                return match.groupValues[1].uppercase(Locale.US) to match.groupValues[2].uppercase(Locale.US)
+            }
+
+        return null
+    }
+
+    private fun displayPlace(name: String, code: String): String =
+        if (name.length <= 2 || name.equals(code, ignoreCase = true)) code else name
+
+    private fun String.cleanPlaceName(): String =
+        replace(Regex("\\b(from|to|departure|arrival)\\b", RegexOption.IGNORE_CASE), "")
+            .trim(' ', '-', ':', '(', ')')
+            .ifBlank { this.trim() }
+
     private fun findAllDates(text: String, today: LocalDate): List<LocalDate> {
         return findAllDatesInTextOrder(text, today).distinct().sorted()
     }
@@ -400,8 +458,48 @@ class ActionDetector {
         else -> "Low confidence"
     }
 
+    private fun formatEpochDate(epochMillis: Long, zoneId: ZoneId): String =
+        LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(epochMillis), zoneId).toLocalDate().format(shortDateFormatter)
+
+    private fun List<DetectedAction>.suppressWeakNonTravelActionsForClearFlight(text: String): List<DetectedAction> {
+        if (none { it.type == "Travel" } || !text.hasClearFlightConfirmation()) return this
+        return filter { it.type == "Travel" }
+    }
+
+    private fun String.hasClearFlightConfirmation(): Boolean {
+        val hasAirline = containsAny("qatar airways", "airways", "airlines", "airline", "flight")
+        val hasFlightNumber = findFlightNumber() != null
+        val hasTicketReference = Regex(
+            "\\b(booking reference|booking confirmed|confirmation|flight number|ticket number|e-?ticket|boarding pass|PNR|reservation code)\\b",
+            RegexOption.IGNORE_CASE,
+        ).containsMatchIn(this)
+        val hasRouteOrAirport = Regex("\\b[A-Z]{3}\\b").findAll(this).count() >= 2 ||
+            containsAny("airport", "departure", "arrival", "gate", "terminal", "boarding")
+        return hasFlightNumber && (hasAirline || hasTicketReference || hasRouteOrAirport)
+    }
+
+    private fun String.hasFlightContext(): Boolean =
+        containsAny("flight", "departure", "boarding", "booking", "airport", "airways", "airlines", "airline", "gate", "terminal", "pnr", "e-ticket", "ticket number", "flight number")
+
+    private fun String.findFlightNumber(): String? {
+        val knownAirlineCodes = setOf(
+            "QR", "EK", "EY", "SV", "GF", "WY", "KU", "BA", "AF", "KL", "LH", "LX", "OS", "TK", "AA", "DL", "UA", "AC",
+            "IB", "AZ", "SQ", "CX", "QF", "AI", "6E", "FZ", "XY", "PC", "RJ", "MS", "ET", "SA", "MH", "TG", "JL", "NH",
+        )
+        return Regex("\\b([A-Z0-9]{2})\\s?([0-9]{2,4}[A-Z]?)\\b", RegexOption.IGNORE_CASE)
+            .findAll(this)
+            .firstOrNull { match ->
+                match.groupValues[1].uppercase(Locale.US) in knownAirlineCodes
+            }
+            ?.let { "${it.groupValues[1]}${it.groupValues[2]}".uppercase(Locale.US) }
+    }
+
     private fun String.containsTime(): Boolean = Regex("\\b([01]?\\d|2[0-3])[:.]([0-5]\\d)\\b").containsMatchIn(this)
 
     private fun String.containsAny(vararg needles: String): Boolean =
         needles.any { contains(it, ignoreCase = true) }
+
+    private companion object {
+        val shortDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.ENGLISH)
+    }
 }
