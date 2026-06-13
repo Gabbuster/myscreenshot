@@ -1,7 +1,9 @@
 package com.example.myscreenshot.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,6 +29,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -38,6 +44,8 @@ import com.example.myscreenshot.ocr.OcrProcessor
 import com.example.myscreenshot.ocr.SharedInput
 import com.example.myscreenshot.ui.components.ActionCard
 import com.example.myscreenshot.ui.components.SourceThumbnail
+import com.example.myscreenshot.ui.theme.AppCoral
+import com.example.myscreenshot.ui.theme.AppOrange
 import com.example.myscreenshot.ui.theme.MyScreenshotTheme
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
@@ -172,29 +180,48 @@ fun ReviewSaveContent(
         item {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 TextButton(onClick = onBack) { Text("Back") }
-                Text("Review & Save", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text("Review", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             }
         }
         item {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(18.dp))
+                    .shadow(10.dp, RoundedCornerShape(26.dp), ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
+                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(26.dp))
                     .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                SourceThumbnail(sourceType, modifier = Modifier.height(72.dp))
-                Text(sourceNote)
+                SourceThumbnail(sourceType, modifier = Modifier.height(76.dp))
+                Text("Local capture analysis", color = Color.White, style = MaterialTheme.typography.titleLarge)
+                Text(sourceNote, color = Color.White.copy(alpha = 0.72f))
                 if (loading) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        CircularProgressIndicator()
-                        Text("Reading shared content")
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        CircularProgressIndicator(color = Color.White)
+                        Text("Reading shared content", color = Color.White)
                     }
                 } else {
-                    Text("${drafts.size} actions found")
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Brush.linearGradient(listOf(AppOrange, AppCoral)), RoundedCornerShape(20.dp))
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text("${drafts.size} actions found", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        Text("Ready to save", color = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f))
+                    }
                 }
                 errorMessage?.let {
-                    Text(it, color = MaterialTheme.colorScheme.error)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.errorContainer, RoundedCornerShape(16.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.32f), RoundedCornerShape(16.dp))
+                            .padding(12.dp),
+                    ) {
+                        Text(it, color = MaterialTheme.colorScheme.onErrorContainer)
+                    }
                 }
             }
         }
@@ -214,6 +241,12 @@ fun ReviewSaveContent(
                 onClick = onSave,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = drafts.any { it.checked } && !loading && !saving,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
+                shape = RoundedCornerShape(18.dp),
+                contentPadding = PaddingValues(vertical = 15.dp),
             ) {
                 Text(if (saving) "Saving..." else "Save actions")
             }
@@ -224,7 +257,8 @@ fun ReviewSaveContent(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(18.dp))
+                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(22.dp))
+                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(22.dp))
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {

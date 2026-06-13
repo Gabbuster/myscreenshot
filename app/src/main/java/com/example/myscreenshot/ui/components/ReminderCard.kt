@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -18,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -32,12 +34,18 @@ fun ReminderCard(
     modifier: Modifier = Modifier,
 ) {
     val isPast = reminder.dateTime?.let { it < System.currentTimeMillis() } == true
+    val confidencePercent = when (reminder.confidence) {
+        "High confidence" -> "95%"
+        "Review needed" -> "78%"
+        else -> "62%"
+    }
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.45f), RoundedCornerShape(20.dp))
-            .heightIn(min = 96.dp)
+            .shadow(6.dp, RoundedCornerShape(22.dp), ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.06f))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(22.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.65f), RoundedCornerShape(22.dp))
+            .heightIn(min = 112.dp)
             .clickable(role = Role.Button, onClick = onClick)
             .padding(16.dp),
     ) {
@@ -49,8 +57,9 @@ fun ReminderCard(
                     reminder.title,
                     color = if (isPast) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.titleMedium,
                 )
-                Text(reminder.type, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                Text(reminder.type, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 reminder.dateTime?.let { start ->
                     val df = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
                     val startStr = df.format(Date(start))
@@ -62,14 +71,30 @@ fun ReminderCard(
                     Text(
                         dateText,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
                     )
                 }
                 if (reminder.notes.isNotBlank()) {
-                    Text(reminder.notes.lineSequence().first(), style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        reminder.notes.lineSequence().first(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
                 }
             }
             if (isPast) {
                 PassedStamp()
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(18.dp))
+                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(18.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(confidencePercent, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }

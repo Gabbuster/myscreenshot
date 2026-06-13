@@ -24,8 +24,8 @@ fun ReminderTypeIcon(type: String, modifier: Modifier = Modifier) {
         modifier = modifier
             .size(48.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f), RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f))
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.48f), RoundedCornerShape(16.dp))
             .padding(6.dp),
         contentAlignment = Alignment.Center,
     ) {

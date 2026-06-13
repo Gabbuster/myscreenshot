@@ -8,14 +8,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 private val DarkColorScheme = darkColorScheme(
-    primary = AppTeal,
-    onPrimary = AppDeepTeal,
-    primaryContainer = Color(0xFF064B54),
-    onPrimaryContainer = AppMint,
-    secondary = AppCobalt,
-    onSecondary = AppMint,
-    secondaryContainer = Color(0xFF163F8F),
-    onSecondaryContainer = Color(0xFFE8F0FF),
+    primary = Color(0xFFFF7A4C),
+    onPrimary = AppInk,
+    primaryContainer = Color(0xFF3B1820),
+    onPrimaryContainer = Color(0xFFFFD7C7),
+    secondary = Color(0xFFFFB15E),
+    onSecondary = AppInk,
+    secondaryContainer = Color(0xFF4A2A0C),
+    onSecondaryContainer = Color(0xFFFFDDB7),
     tertiary = AppCoral,
     tertiaryContainer = Color(0xFF5A211A),
     onTertiaryContainer = Color(0xFFFFE6E1),
@@ -32,23 +32,23 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = AppDeepTeal,
-    onPrimary = AppMint,
-    primaryContainer = AppMint,
-    onPrimaryContainer = AppDeepTeal,
-    secondary = AppCobalt,
-    onSecondary = Color.White,
-    secondaryContainer = Color(0xFFDCE8FF),
-    onSecondaryContainer = Color(0xFF0D2D6B),
+    primary = AppInk,
+    onPrimary = Color.White,
+    primaryContainer = AppPeach,
+    onPrimaryContainer = AppInk,
+    secondary = AppOrange,
+    onSecondary = AppInk,
+    secondaryContainer = Color(0xFFFFE7C7),
+    onSecondaryContainer = Color(0xFF35200A),
     tertiary = AppCoral,
-    tertiaryContainer = Color(0xFFFFE6E1),
-    onTertiaryContainer = Color(0xFF651F14),
+    tertiaryContainer = Color(0xFFFFE4E8),
+    onTertiaryContainer = Color(0xFF5B111B),
     background = AppLightBackground,
     onBackground = AppDarkText,
     surface = AppCard,
     onSurface = AppDarkText,
-    surfaceVariant = Color(0xFFDDECE8),
-    onSurfaceVariant = Color(0xFF43636B),
+    surfaceVariant = AppSurface,
+    onSurfaceVariant = AppMuted,
     outline = AppBorder,
     error = AppError,
     errorContainer = Color(0xFFFFDAD6),
@@ -75,10 +75,10 @@ fun MyScreenshotTheme(
 }
 
 private object ColorTokens {
-    val DarkBackground = androidx.compose.ui.graphics.Color(0xFF061B22)
-    val DarkSurface = androidx.compose.ui.graphics.Color(0xFF0D2A33)
-    val DarkSurfaceVariant = androidx.compose.ui.graphics.Color(0xFF123844)
-    val DarkText = androidx.compose.ui.graphics.Color(0xFFE7FFFB)
-    val DarkMutedText = androidx.compose.ui.graphics.Color(0xFFA8C9C4)
-    val DarkBorder = androidx.compose.ui.graphics.Color(0xFF245460)
+    val DarkBackground = androidx.compose.ui.graphics.Color(0xFF070B12)
+    val DarkSurface = androidx.compose.ui.graphics.Color(0xFF111925)
+    val DarkSurfaceVariant = androidx.compose.ui.graphics.Color(0xFF1B2430)
+    val DarkText = androidx.compose.ui.graphics.Color(0xFFF4F2EF)
+    val DarkMutedText = androidx.compose.ui.graphics.Color(0xFFADB3BA)
+    val DarkBorder = androidx.compose.ui.graphics.Color(0xFF303947)
 }
