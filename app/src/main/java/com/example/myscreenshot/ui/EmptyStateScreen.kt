@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -19,13 +18,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.example.myscreenshot.ui.theme.AppCoral
 import com.example.myscreenshot.ui.theme.AppInk
-import com.example.myscreenshot.ui.theme.AppOrange
+import com.example.myscreenshot.ui.theme.AppScan
 import com.example.myscreenshot.ui.theme.MyScreenshotTheme
 
 @Composable
@@ -53,9 +50,9 @@ fun EmptyStateCard(onTrySample: () -> Unit, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .shadow(8.dp, RoundedCornerShape(26.dp), ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(26.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(26.dp))
+            .shadow(3.dp, RoundedCornerShape(8.dp), ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -63,10 +60,10 @@ fun EmptyStateCard(onTrySample: () -> Unit, modifier: Modifier = Modifier) {
         Box(
             modifier = Modifier
                 .size(58.dp)
-                .background(Brush.linearGradient(listOf(AppOrange, AppCoral)), CircleShape),
+                .background(AppInk, RoundedCornerShape(8.dp)),
             contentAlignment = Alignment.Center,
         ) {
-            Text("+", color = AppInk, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text("+", color = AppScan, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         }
         Text("No reminders yet", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Text(
@@ -79,7 +76,7 @@ fun EmptyStateCard(onTrySample: () -> Unit, modifier: Modifier = Modifier) {
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
             ),
-            shape = RoundedCornerShape(18.dp),
+            shape = RoundedCornerShape(8.dp),
         ) {
             Text("Try sample screenshot")
         }

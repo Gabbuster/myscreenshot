@@ -10,6 +10,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,7 +18,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -27,6 +27,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -39,9 +40,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -54,11 +55,11 @@ import com.example.myscreenshot.extraction.DetectedAction
 import com.example.myscreenshot.extraction.OnDeviceAiExtractor
 import com.example.myscreenshot.ocr.OcrProcessor
 import com.example.myscreenshot.ocr.SharedInput
-import com.example.myscreenshot.ui.components.ActionCard
+import com.example.myscreenshot.ui.components.ReminderTypeIcon
 import com.example.myscreenshot.ui.components.SourceThumbnail
-import com.example.myscreenshot.ui.theme.AppCoral
 import com.example.myscreenshot.ui.theme.AppInk
-import com.example.myscreenshot.ui.theme.AppOrange
+import com.example.myscreenshot.ui.theme.AppPaper
+import com.example.myscreenshot.ui.theme.AppProof
 import com.example.myscreenshot.ui.theme.AppSuccess
 import com.example.myscreenshot.ui.theme.MyScreenshotTheme
 import kotlinx.coroutines.launch
@@ -230,74 +231,80 @@ fun ReviewSaveContent(
     onDraftChanged: (Int, ActionDraft) -> Unit,
     onToggleDetectedText: () -> Unit,
 ) {
+    val selectedDrafts = drafts.filter { it.checked }
+    val primaryDraft = selectedDrafts.firstOrNull() ?: drafts.firstOrNull()
+    val bestGuessDraft = drafts.firstOrNull()
+    val actionCount = drafts.size
+    val ambiguousOptions = drafts.distinctCategoryOptions()
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
         contentPadding = PaddingValues(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 TextButton(onClick = onBack) { Text("Back") }
-                Text("Review", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            }
-        }
-        item {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .shadow(10.dp, RoundedCornerShape(26.dp), ambientColor = AppInk.copy(alpha = 0.10f))
-                    .background(AppInk, RoundedCornerShape(26.dp))
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                SourceThumbnail(sourceType, modifier = Modifier.height(76.dp), sourceUri = sourceUri)
-                Text("Local capture analysis", color = Color.White, style = MaterialTheme.typography.titleLarge)
-                Text(sourceNote, color = Color.White.copy(alpha = 0.72f))
-                aiAssistNote?.let {
-                    Text(it, color = Color.White.copy(alpha = 0.82f), style = MaterialTheme.typography.labelLarge)
-                }
-                if (loading) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                        CircularProgressIndicator(color = Color.White)
-                        Text("Reading shared content", color = Color.White)
-                    }
-                } else {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Brush.linearGradient(listOf(AppOrange, AppCoral)), RoundedCornerShape(20.dp))
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text("${drafts.size} actions found", color = AppInk, fontWeight = FontWeight.Bold)
-                        Text("Ready to save", color = AppInk.copy(alpha = 0.74f))
-                    }
-                }
-                errorMessage?.let {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.errorContainer, RoundedCornerShape(16.dp))
-                            .border(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.32f), RoundedCornerShape(16.dp))
-                            .padding(12.dp),
-                    ) {
-                        Text(it, color = MaterialTheme.colorScheme.onErrorContainer)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Review detected reminder", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                        Text(
+                            if (ambiguousOptions.size > 1) {
+                                "AI found ${ambiguousOptions.size} possible matches"
+                            } else if (actionCount == 1) {
+                                "AI found 1 action"
+                            } else {
+                                "AI found $actionCount actions"
+                            },
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             }
         }
-        itemsIndexed(drafts) { index, draft ->
-            ActionCard(
-                action = draft.action,
-                checked = draft.checked,
-                title = draft.title,
-                notes = draft.notes,
-                sourceType = sourceType,
-                sourceUri = sourceUri,
-                onCheckedChange = { onDraftChanged(index, draft.copy(checked = it)) },
-            )
+        if (loading) {
+            item {
+                LoadingResultCard()
+            }
+        } else {
+            errorMessage?.let { message ->
+                item {
+                    ErrorCard(message)
+                }
+            }
+            if (drafts.isEmpty()) {
+                item {
+                    EmptyResultCard()
+                }
+            }
+            if (ambiguousOptions.size > 1 && bestGuessDraft != null) {
+                item {
+                    AmbiguousResultCard(
+                        options = ambiguousOptions,
+                        bestGuessDraft = bestGuessDraft,
+                    )
+                }
+            }
+            drafts.forEachIndexed { index, draft ->
+                item {
+                    PrimaryResultCard(
+                        draft = draft,
+                        onCheckedChange = { onDraftChanged(index, draft.copy(checked = it)) },
+                    )
+                }
+            }
+            primaryDraft?.let { draft ->
+                item {
+                    SmartRemindersCard(action = draft.action)
+                }
+                item {
+                    QuickActionsCard(action = draft.action)
+                }
+            }
         }
         item {
             Button(
@@ -308,29 +315,346 @@ fun ReviewSaveContent(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(8.dp),
                 contentPadding = PaddingValues(vertical = 15.dp),
             ) {
-                Text(if (saving) "Saving..." else "Save actions")
+                Text(
+                    when {
+                        saving -> "Saving..."
+                        selectedDrafts.size == 1 -> "Save Reminder"
+                        else -> "Save ${selectedDrafts.size} Reminders"
+                    },
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
             }
-            TextButton(onClick = onToggleDetectedText, enabled = detectedText.isNotBlank()) {
-                Text(if (showDetectedText) "Hide detected text" else "Review detected text")
+        }
+        item {
+            SourceDetailsSection(
+                expanded = showDetectedText,
+                onToggle = onToggleDetectedText,
+                sourceType = sourceType,
+                sourceNote = sourceNote,
+                sourceUri = sourceUri,
+                aiAssistNote = aiAssistNote,
+                detectedText = detectedText,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AmbiguousResultCard(
+    options: List<String>,
+    bestGuessDraft: ActionDraft,
+) {
+    ResultSurface {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("A few things look possible", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(
+                "I found ${options.joinToString(" or ")}. Best guess: ${bestGuessDraft.action.type.cleanCategoryName()} because it has the strongest reminder signals.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyLarge,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            options.take(3).forEach { option ->
+                OptionChip(option)
             }
-            if (showDetectedText) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(22.dp))
-                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(22.dp))
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+        }
+    }
+}
+
+@Composable
+private fun OptionChip(text: String) {
+    Box(
+        modifier = Modifier
+            .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(50))
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, color = MaterialTheme.colorScheme.onPrimaryContainer, style = MaterialTheme.typography.labelMedium)
+    }
+}
+
+@Composable
+private fun LoadingResultCard() {
+    ResultSurface {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Finding the reminder", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("AI is looking for the action and date.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ErrorCard(message: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.errorContainer, RoundedCornerShape(22.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text("Needs another look", color = MaterialTheme.colorScheme.onErrorContainer, fontWeight = FontWeight.Bold)
+        Text(message, color = MaterialTheme.colorScheme.onErrorContainer)
+    }
+}
+
+@Composable
+private fun EmptyResultCard() {
+    ResultSurface {
+        Text("No reminder found", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(
+            "Try a screenshot with a date, amount, booking, delivery, or appointment.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun PrimaryResultCard(
+    draft: ActionDraft,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    val action = draft.action
+    ResultSurface {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top,
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ReminderTypeIcon(action.type)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.weight(1f)) {
+                    Text(action.type.uppercase(), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
+                    Text(draft.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                }
+            }
+            Switch(checked = draft.checked, onCheckedChange = onCheckedChange)
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            action.primaryDateLabel()?.let { FieldBlock(label = it.first, value = it.second) }
+            action.secondaryDateLabel()?.let { FieldBlock(label = it.first, value = it.second) }
+            action.amountLabel()?.let { FieldBlock(label = "Amount", value = it) }
+            action.location?.takeIf { it.isNotBlank() }?.let { FieldBlock(label = action.locationLabel(), value = it) }
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("AI Summary", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(action.aiSummary(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun FieldBlock(label: String, value: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
+        Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun SmartRemindersCard(action: DetectedAction) {
+    ResultSurface {
+        Text("Suggested reminders", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            action.smartReminderLabels().forEach { label ->
+                SmartReminderToggle(label)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SmartReminderToggle(label: String) {
+    var enabled by remember(label) { mutableStateOf(true) }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("✓ $label", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+        Switch(checked = enabled, onCheckedChange = { enabled = it })
+    }
+}
+
+@Composable
+private fun QuickActionsCard(action: DetectedAction) {
+    val actions = action.quickActions()
+    if (actions.isEmpty()) return
+    ResultSurface {
+        Text("Quick actions", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            actions.forEach { label ->
+                OutlinedButton(
+                    onClick = {},
+                    enabled = false,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(16.dp),
                 ) {
-                    Text("Detected text", fontWeight = FontWeight.SemiBold)
-                    Text(detectedText, style = MaterialTheme.typography.bodyMedium)
+                    Text(label)
                 }
             }
         }
     }
+}
+
+@Composable
+private fun SourceDetailsSection(
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    sourceType: String,
+    sourceNote: String,
+    sourceUri: String?,
+    aiAssistNote: String?,
+    detectedText: String,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(AppPaper, RoundedCornerShape(22.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        TextButton(onClick = onToggle, modifier = Modifier.fillMaxWidth()) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Source details", fontWeight = FontWeight.SemiBold)
+                Text(if (expanded) "Hide" else "Show")
+            }
+        }
+        if (expanded) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Original screenshot", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                SourceThumbnail(
+                    sourceType = sourceType,
+                    sourceUri = sourceUri,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp),
+                )
+                Text("OCR text", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(
+                    detectedText.ifBlank { "No OCR text saved." },
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text("Technical information", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(
+                    listOfNotNull(
+                        "Source type: $sourceType",
+                        sourceNote.takeIf { it.isNotBlank() },
+                        aiAssistNote?.takeIf { it.isNotBlank() },
+                    ).joinToString("\n"),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ResultSurface(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(6.dp, RoundedCornerShape(28.dp), ambientColor = AppInk.copy(alpha = 0.07f))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(28.dp))
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        content = content,
+    )
+}
+
+private fun DetectedAction.aiSummary(): String = when (type.lowercase()) {
+    "travel" -> "Flight booking detected."
+    "hotel" -> "Hotel reservation detected."
+    "appointment" -> "Appointment detected."
+    "bill" -> "Bill payment detected."
+    "documents", "document" -> "Document expiry detected."
+    "delivery" -> "Delivery notification detected."
+    else -> "Reminder detected."
+}
+
+private fun DetectedAction.primaryDateLabel(): Pair<String, String>? {
+    val value = dateTime ?: return null
+    val label = when (type.lowercase()) {
+        "hotel" -> "Check-in"
+        "bill" -> "Due date"
+        "documents", "document" -> "Expiry date"
+        "delivery" -> "Expected delivery"
+        "travel" -> "Departure"
+        else -> "Date"
+    }
+    return label to value.formatActionDate()
+}
+
+private fun DetectedAction.secondaryDateLabel(): Pair<String, String>? {
+    val value = endDateTime ?: return null
+    val label = when (type.lowercase()) {
+        "hotel" -> "Check-out"
+        else -> "Ends"
+    }
+    return label to value.formatActionDate()
+}
+
+private fun DetectedAction.amountLabel(): String? =
+    amount?.let { "${currency.orEmpty()} ${String.format("%.2f", it)}".trim() }
+
+private fun DetectedAction.locationLabel(): String = when (type.lowercase()) {
+    "hotel" -> "Address"
+    "appointment" -> "Location"
+    "delivery" -> "Delivery address"
+    "travel" -> "Airport"
+    else -> "Location"
+}
+
+private fun DetectedAction.smartReminderLabels(): List<String> {
+    val detectedLabels = reminderSuggestions.map { it.label }.filter { it.isNotBlank() }
+    if (detectedLabels.isNotEmpty()) return detectedLabels.take(3)
+    return when (type.lowercase()) {
+        "hotel" -> listOf("Hotel preparation 7 days before", "Check-in reminder", "Check-out reminder")
+        "travel" -> listOf("Check-in opens", "Leave for airport", "Flight departure")
+        "appointment" -> listOf("Reminder 1 day before", "Reminder 2 hours before", "Leave on time")
+        "bill" -> listOf("Due soon", "Due tomorrow", "Due today")
+        "documents", "document" -> listOf("Renew 6 months before", "Renew 3 months before", "Expiry warning")
+        "delivery" -> listOf("Delivery expected", "Package arriving today", "Follow up if delayed")
+        else -> listOf("Reminder 1 day before", "Reminder 2 hours before")
+    }
+}
+
+private fun DetectedAction.quickActions(): List<String> = when (type.lowercase()) {
+    "travel" -> listOf("Calendar", "Airport")
+    "hotel" -> listOf("Calendar", "Maps", "Call")
+    "appointment" -> listOf("Calendar", "Maps", "Call")
+    "bill" -> listOf("Pay", "Reminder")
+    "documents", "document" -> listOf("Reminder", "Share")
+    "delivery" -> listOf("Track", "Address")
+    else -> listOf("Reminder")
+}
+
+private fun List<ActionDraft>.distinctCategoryOptions(): List<String> =
+    map { it.action.type.cleanCategoryName() }
+        .distinct()
+        .take(4)
+
+private fun String.cleanCategoryName(): String = when (lowercase()) {
+    "documents" -> "Document"
+    else -> replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+}
+
+private fun Long.formatActionDate(): String {
+    val zoneId = ZoneId.systemDefault()
+    return DateTimeFormatter.ofPattern("d MMM yyyy • HH:mm")
+        .format(Instant.ofEpochMilli(this).atZone(zoneId))
 }
 
 @Composable
@@ -382,7 +706,8 @@ private fun SavedReminderSheet(
     var alarmTime by remember(reminder.id) { mutableStateOf(suggestedAlarmTime(reminder)) }
     var statusText by remember { mutableStateOf<String?>(null) }
     var scheduling by remember { mutableStateOf(false) }
-    var calendarSaved by remember(reminder.id) { mutableStateOf(false) }
+    var calendarSelected by remember(reminder.id) { mutableStateOf(false) }
+    var alarmSelected by remember(reminder.id) { mutableStateOf(false) }
     var alarmSaved by remember(reminder.id) { mutableStateOf(false) }
     val canAddCalendar = reminder.dateTime != null
     val zoneId = ZoneId.systemDefault()
@@ -391,9 +716,9 @@ private fun SavedReminderSheet(
         contract = ActivityResultContracts.StartActivityForResult(),
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
-            calendarSaved = true
+            calendarSelected = true
             statusText = "Calendar event saved"
-        } else if (!calendarSaved) {
+        } else if (!calendarSelected) {
             statusText = "Finish the event in your calendar app to save it."
         }
     }
@@ -404,141 +729,185 @@ private fun SavedReminderSheet(
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text("Saved", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text(reminder.title, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Saved", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(
+                reminder.title,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 2,
+            )
 
-            if (canAddCalendar) {
-                Button(
-                    onClick = {
+            if (calendarSelected) {
+                SuccessMention(
+                    text = "Reminder saved in calendar",
+                    accent = MaterialTheme.colorScheme.primaryContainer,
+                )
+            } else {
+                QuestionToggleRow(
+                    question = "Save in calendar",
+                    selected = false,
+                    hint = "Adds a calendar event for this reminder.",
+                    onYes = {
+                        if (!canAddCalendar) {
+                            statusText = "No date found to save in calendar."
+                            return@QuestionToggleRow
+                        }
                         runCatching { calendarLauncher.launch(CalendarIntentBuilder.build(reminder)) }
                             .onFailure { statusText = "Calendar app not available on this device." }
                     },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
-                    contentPadding = PaddingValues(vertical = 15.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (calendarSaved) AppSuccess else MaterialTheme.colorScheme.primary,
-                        contentColor = if (calendarSaved) Color.White else MaterialTheme.colorScheme.onPrimary,
-                    ),
-                ) {
-                    Text(if (calendarSaved) "Saved to calendar" else "Add to calendar")
-                }
+                    onNo = {
+                        calendarSelected = false
+                        statusText = null
+                    },
+                )
             }
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(22.dp))
-                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.45f), RoundedCornerShape(22.dp))
-                    .padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text("Phone alarm", fontWeight = FontWeight.SemiBold)
-                TextField(
-                    value = alarmTitle,
-                    onValueChange = {
-                        alarmTitle = it
-                        alarmSaved = false
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    label = { Text("Alarm title") },
+            if (alarmSaved) {
+                SuccessMention(
+                    text = "Reminder saved into Alarms",
+                    accent = AppSuccess.copy(alpha = 0.18f),
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                    OutlinedButton(
-                        onClick = {
-                            DatePickerDialog(
-                                context,
-                                { _, year, month, day ->
-                                    val selectedDate = LocalDate.of(year, month + 1, day)
-                                    alarmTime = LocalDateTime.of(selectedDate, alarmDateTime.toLocalTime())
-                                        .atZone(zoneId)
-                                        .toInstant()
-                                        .toEpochMilli()
-                                    alarmSaved = false
-                                },
-                                alarmDateTime.year,
-                                alarmDateTime.monthValue - 1,
-                                alarmDateTime.dayOfMonth,
-                            ).show()
-                        },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(16.dp),
-                    ) {
-                        Text(alarmDateTime.format(DateTimeFormatter.ofPattern("MMM d")))
-                    }
-                    OutlinedButton(
-                        onClick = {
-                            TimePickerDialog(
-                                context,
-                                { _, hour, minute ->
-                                    alarmTime = LocalDateTime.of(alarmDateTime.toLocalDate(), LocalTime.of(hour, minute))
-                                        .atZone(zoneId)
-                                        .toInstant()
-                                        .toEpochMilli()
-                                    alarmSaved = false
-                                },
-                                alarmDateTime.hour,
-                                alarmDateTime.minute,
-                                false,
-                            ).show()
-                        },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(16.dp),
-                    ) {
-                        Text(alarmDateTime.format(DateTimeFormatter.ofPattern("h:mm a")))
-                    }
-                }
-                AlarmSuggestionRow(
-                    reminder = reminder,
-                    selectedTime = alarmTime,
-                    onSelected = {
-                        alarmTime = it
-                        alarmSaved = false
+            } else {
+                QuestionToggleRow(
+                    question = "Set an alarm on your phone",
+                    selected = alarmSelected,
+                    hint = "You can tune the alarm after this step.",
+                    onYes = {
+                        alarmSelected = true
+                        statusText = null
+                    },
+                    onNo = {
+                        alarmSelected = false
+                        statusText = null
                     },
                 )
-                Button(
-                    onClick = {
-                        scope.launch {
-                            scheduling = true
-                            runCatching {
-                                repository.scheduleCustomAlert(
-                                    reminder = reminder,
-                                    alertDateTime = alarmTime,
-                                    alertLabel = alarmTitle,
-                                )
-                            }.onSuccess {
-                                alarmSaved = true
-                                statusText = "Phone alarm set"
-                            }.onFailure {
-                                statusText = "Could not set the phone reminder."
-                            }
-                            scheduling = false
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = alarmTime > System.currentTimeMillis() && alarmTitle.isNotBlank() && !scheduling,
-                    shape = RoundedCornerShape(18.dp),
-                    contentPadding = PaddingValues(vertical = 15.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (alarmSaved) AppSuccess else MaterialTheme.colorScheme.primary,
-                        contentColor = Color.White,
-                    ),
+            }
+
+            if (alarmSelected && !alarmSaved) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(24.dp))
+                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.45f), RoundedCornerShape(24.dp))
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    Text(
-                        when {
-                            scheduling -> "Setting..."
-                            alarmSaved -> "Phone alarm saved"
-                            else -> "Set phone alarm"
+                    Text("Adjust the alarm", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    TextField(
+                        value = alarmTitle,
+                        onValueChange = {
+                            alarmTitle = it
+                            alarmSaved = false
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("Alarm title") },
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                        OutlinedButton(
+                            onClick = {
+                                DatePickerDialog(
+                                    context,
+                                    { _, year, month, day ->
+                                        val selectedDate = LocalDate.of(year, month + 1, day)
+                                        alarmTime = LocalDateTime.of(selectedDate, alarmDateTime.toLocalTime())
+                                            .atZone(zoneId)
+                                            .toInstant()
+                                            .toEpochMilli()
+                                        alarmSaved = false
+                                    },
+                                    alarmDateTime.year,
+                                    alarmDateTime.monthValue - 1,
+                                    alarmDateTime.dayOfMonth,
+                                ).show()
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(14.dp),
+                        ) {
+                            Text(
+                                alarmDateTime.format(DateTimeFormatter.ofPattern("MMM d")),
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 1,
+                            )
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                TimePickerDialog(
+                                    context,
+                                    { _, hour, minute ->
+                                        alarmTime = LocalDateTime.of(alarmDateTime.toLocalDate(), LocalTime.of(hour, minute))
+                                            .atZone(zoneId)
+                                            .toInstant()
+                                            .toEpochMilli()
+                                        alarmSaved = false
+                                    },
+                                    alarmDateTime.hour,
+                                    alarmDateTime.minute,
+                                    false,
+                                ).show()
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(14.dp),
+                        ) {
+                            Text(
+                                alarmDateTime.format(DateTimeFormatter.ofPattern("h:mm a")),
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                    AlarmSuggestionRow(
+                        reminder = reminder,
+                        selectedTime = alarmTime,
+                        onSelected = {
+                            alarmTime = it
+                            alarmSaved = false
                         },
                     )
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                scheduling = true
+                                runCatching {
+                                    repository.scheduleCustomAlert(
+                                        reminder = reminder,
+                                        alertDateTime = alarmTime,
+                                        alertLabel = alarmTitle,
+                                    )
+                                }.onSuccess {
+                                    alarmSaved = true
+                                    alarmSelected = false
+                                    statusText = "Phone alarm set"
+                                }.onFailure {
+                                    statusText = "Could not set the phone reminder."
+                                }
+                                scheduling = false
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = alarmTime > System.currentTimeMillis() && alarmTitle.isNotBlank() && !scheduling,
+                        shape = RoundedCornerShape(16.dp),
+                        contentPadding = PaddingValues(vertical = 15.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (alarmSaved) AppSuccess else MaterialTheme.colorScheme.primary,
+                            contentColor = Color.White,
+                        ),
+                    ) {
+                        Text(
+                            when {
+                                scheduling -> "Setting..."
+                                alarmSaved -> "Phone alarm saved"
+                                else -> "Set phone alarm"
+                            },
+                        )
+                    }
                 }
             }
 
             statusText?.let {
-                Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
             }
             TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
                 Text("Done")
@@ -555,28 +924,111 @@ private fun AlarmSuggestionRow(
 ) {
     val suggestions = reminder.alarmSuggestions()
     if (suggestions.isEmpty()) return
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-        suggestions.forEach { suggestion ->
-            OutlinedButton(
-                onClick = { onSelected(suggestion.time) },
-                shape = RoundedCornerShape(50),
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = if (selectedTime == suggestion.time) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.surface
-                    },
-                    contentColor = if (selectedTime == suggestion.time) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
-                ),
-            ) {
-                Text(suggestion.label)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Quick picks", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            suggestions.forEach { suggestion ->
+                OutlinedButton(
+                    onClick = { onSelected(suggestion.time) },
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = if (selectedTime == suggestion.time) {
+                            MaterialTheme.colorScheme.primaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surface
+                        },
+                        contentColor = if (selectedTime == suggestion.time) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
+                    ),
+                ) {
+                    Text(
+                        suggestion.label,
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1,
+                    )
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun QuestionToggleRow(
+    question: String,
+    selected: Boolean,
+    hint: String,
+    onYes: () -> Unit,
+    onNo: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            question,
+            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.titleMedium,
+            maxLines = 2,
+        )
+        Text(
+            hint,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            Button(
+                onClick = onYes,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(14.dp),
+                contentPadding = PaddingValues(vertical = 10.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (selected) AppSuccess else MaterialTheme.colorScheme.primary,
+                    contentColor = Color.White,
+                ),
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("V", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("Yes", style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                }
+            }
+            OutlinedButton(
+                onClick = onNo,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(14.dp),
+                contentPadding = PaddingValues(vertical = 10.dp),
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("X", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("No", style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SuccessMention(
+    text: String,
+    accent: Color,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(accent, RoundedCornerShape(18.dp))
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("Saved", color = MaterialTheme.colorScheme.onPrimaryContainer, style = MaterialTheme.typography.labelMedium)
+        Text(
+            text,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 2,
+        )
     }
 }
 

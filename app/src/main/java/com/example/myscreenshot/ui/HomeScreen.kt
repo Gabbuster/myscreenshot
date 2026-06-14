@@ -9,22 +9,18 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -46,19 +42,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.myscreenshot.data.AppRepository
 import com.example.myscreenshot.data.Reminder
 import com.example.myscreenshot.ui.components.FilterChipRow
 import com.example.myscreenshot.ui.components.ReminderCard
-import com.example.myscreenshot.ui.theme.AppCoral
 import com.example.myscreenshot.ui.theme.AppInk
-import com.example.myscreenshot.ui.theme.AppOrange
+import com.example.myscreenshot.ui.theme.AppProof
+import com.example.myscreenshot.ui.theme.AppScan
 import com.example.myscreenshot.ui.theme.MyScreenshotTheme
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
+import java.time.LocalTime
 
 @Composable
 fun HomeScreen(
@@ -90,19 +85,9 @@ fun HomeContent(
     var searchVisible by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     Scaffold(
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onAddManual,
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 8.dp),
-            ) {
-                Text("+", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            }
-        },
         bottomBar = {
             NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
                 tonalElevation = NavigationBarDefaults.Elevation,
             ) {
                 val navItems = listOf(
@@ -137,56 +122,12 @@ fun HomeContent(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(42.dp)
-                                .background(
-                                    Brush.linearGradient(listOf(AppOrange, AppCoral)),
-                                    CircleShape,
-                                ),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text("SR", color = AppInk, fontWeight = FontWeight.Bold)
-                        }
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text("Good morning", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
-                            Text("Your Reminders", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        IconButton(
-                            onClick = { searchVisible = !searchVisible },
-                            modifier = Modifier
-                                .size(46.dp)
-                                .background(MaterialTheme.colorScheme.surface, CircleShape)
-                                .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape),
-                        ) {
-                            SearchGlyph()
-                        }
-                        IconButton(
-                            onClick = onOpenSettings,
-                            modifier = Modifier
-                                .size(46.dp)
-                                .background(MaterialTheme.colorScheme.surface, CircleShape)
-                                .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape),
-                        ) {
-                            SettingsGlyph()
-                        }
-                    }
-                }
-            }
-            item {
-                WorkspaceCard(reminders = reminders, onAddManual = onAddManual)
+                AttentionHero(
+                    reminders = reminders,
+                    onAddScreenshot = onAddManual,
+                    onToggleSearch = { searchVisible = !searchVisible },
+                    onOpenSettings = onOpenSettings,
+                )
             }
             if (searchVisible) {
                 item {
@@ -199,8 +140,8 @@ fun HomeContent(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Quick filters", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("${reminders.count { it.dateTime == null || it.dateTime >= System.currentTimeMillis() }} active", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Focus by type", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("${reminders.count { it.dateTime == null || it.dateTime >= System.currentTimeMillis() }} active", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
                 }
             }
             item {
@@ -214,7 +155,7 @@ fun HomeContent(
                 }
             } else {
                 item {
-                    Text("Recent activity", color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold)
+                    Text("Recent captures", color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelLarge)
                 }
                 items(visibleReminders) { reminder ->
                     ReminderCard(reminder = reminder, onClick = { onOpenReminder(reminder.id) })
@@ -225,89 +166,121 @@ fun HomeContent(
 }
 
 @Composable
-private fun WorkspaceCard(reminders: List<Reminder>, onAddManual: () -> Unit) {
+private fun AttentionHero(
+    reminders: List<Reminder>,
+    onAddScreenshot: () -> Unit,
+    onToggleSearch: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
     val now = System.currentTimeMillis()
     val active = reminders.count { it.dateTime == null || it.dateTime >= now }
     val urgent = reminders.count { reminder ->
         reminder.dateTime?.let { it in now..(now + 86_400_000L) } == true
     }
-    val nextReminder = reminders
-        .filter { it.dateTime != null && it.dateTime >= now }
-        .minByOrNull { it.dateTime ?: Long.MAX_VALUE }
+    val awaitingReview = reminders.count { it.confidence.equals("Review needed", ignoreCase = true) }
+    val headline = when {
+        urgent > 0 -> "$urgent things need attention."
+        active > 0 -> "Your screenshots are under control."
+        else -> "Nothing important is being forgotten."
+    }
+    val status = when {
+        urgent > 0 -> "Due today"
+        active > 0 -> greeting()
+        else -> "Nothing urgent today"
+    }
+    val supportText = if (reminders.isEmpty()) {
+        "Add a screenshot and AI will pull out what matters."
+    } else {
+        "AI extracted ${reminders.size} reminders from your captures."
+    }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(14.dp, RoundedCornerShape(26.dp), ambientColor = AppInk.copy(alpha = 0.18f))
-            .background(AppInk, RoundedCornerShape(26.dp))
+            .shadow(9.dp, RoundedCornerShape(24.dp), ambientColor = AppInk.copy(alpha = 0.14f))
+            .background(AppInk, RoundedCornerShape(24.dp))
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("Screenshot workspace", color = Color.White.copy(alpha = 0.66f), style = MaterialTheme.typography.labelLarge)
-            Text("Capture what matters", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+        BoxWithConstraints {
+            val compact = maxWidth < 340.dp
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
+            ) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(status.uppercase(), color = AppScan, style = MaterialTheme.typography.labelMedium)
+                    Text(
+                        headline,
+                        color = Color.White,
+                        style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        supportText,
+                        color = Color.White.copy(alpha = 0.68f),
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    IconButton(
+                        onClick = onToggleSearch,
+                        modifier = Modifier
+                            .size(38.dp)
+                            .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp)),
+                    ) {
+                        SearchGlyph(color = Color.White)
+                    }
+                    IconButton(
+                        onClick = onOpenSettings,
+                        modifier = Modifier
+                            .size(38.dp)
+                            .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp)),
+                    ) {
+                        SettingsGlyph(color = Color.White)
+                    }
+                }
+            }
         }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(134.dp)
-                .background(Brush.linearGradient(listOf(AppOrange, AppCoral)), RoundedCornerShape(22.dp))
-                .padding(18.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Button(
+            onClick = onAddScreenshot,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color.White,
+                contentColor = AppInk,
+            ),
+            shape = RoundedCornerShape(16.dp),
+            contentPadding = PaddingValues(vertical = 13.dp),
         ) {
-            StatBlock("Active", active.toString(), "saved reminders", Modifier.weight(1f))
-            Box(
-                modifier = Modifier
-                    .width(1.dp)
-                    .fillMaxHeight()
-                    .background(Color.White.copy(alpha = 0.26f))
-            )
-            StatBlock("Today", urgent.toString(), "need attention", Modifier.weight(1f))
+            Text("+ Add Screenshot", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Next reminder", color = Color.White.copy(alpha = 0.62f), style = MaterialTheme.typography.labelMedium)
-                Text(
-                    nextReminder?.title ?: "No deadline yet",
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                )
-                nextReminder?.dateTime?.let {
-                    Text(
-                        DateTimeFormatter.ofPattern("MMM d, h:mm a")
-                            .format(Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault())),
-                        color = Color.White.copy(alpha = 0.72f),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-            }
-            Button(
-                onClick = onAddManual,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.White,
-                    contentColor = AppInk,
-                ),
-                shape = RoundedCornerShape(16.dp),
-                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
-            ) {
-                Text("Add")
-            }
+            HeroChip("Active", active.toString(), Modifier.weight(1f))
+            HeroChip("Due today", urgent.toString(), Modifier.weight(1f))
+            HeroChip("Review", awaitingReview.toString(), Modifier.weight(1f))
         }
     }
 }
 
 @Composable
-private fun StatBlock(label: String, value: String, caption: String, modifier: Modifier = Modifier) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(label, color = AppInk.copy(alpha = 0.72f), style = MaterialTheme.typography.labelMedium)
-        Text(value, color = AppInk, style = MaterialTheme.typography.headlineMedium)
-        Text(caption, color = AppInk.copy(alpha = 0.74f), style = MaterialTheme.typography.bodySmall)
+private fun HeroChip(label: String, value: String, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(15.dp))
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(value, color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(label, color = Color.White.copy(alpha = 0.62f), style = MaterialTheme.typography.labelMedium, maxLines = 1)
     }
 }
 
@@ -320,12 +293,12 @@ private fun SearchField(searchQuery: String, onSearchQueryChange: (String) -> Un
         textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(18.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(18.dp))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
             .padding(horizontal = 16.dp, vertical = 15.dp),
         decorationBox = { innerTextField ->
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Search", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelLarge)
+                Text("FIND", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelLarge)
                 Box(Modifier.weight(1f)) {
                     if (searchQuery.isBlank()) {
                         Text(
@@ -347,17 +320,16 @@ private fun NavDot(selected: Boolean) {
         modifier = Modifier
             .size(if (selected) 22.dp else 10.dp)
             .background(
-                if (selected) Brush.linearGradient(listOf(AppOrange, AppCoral)) else Brush.linearGradient(
+                if (selected) Brush.linearGradient(listOf(AppScan, AppProof)) else Brush.linearGradient(
                     listOf(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.42f), MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.42f)),
                 ),
-                CircleShape,
+                RoundedCornerShape(if (selected) 7.dp else 3.dp),
             )
     )
 }
 
 @Composable
-private fun SearchGlyph() {
-    val color = MaterialTheme.colorScheme.onSurface
+private fun SearchGlyph(color: Color = MaterialTheme.colorScheme.onSurface) {
     Canvas(modifier = Modifier.size(20.dp)) {
         drawCircle(
             color = color,
@@ -376,13 +348,22 @@ private fun SearchGlyph() {
 }
 
 @Composable
-private fun SettingsGlyph() {
-    val color = MaterialTheme.colorScheme.onSurface
+private fun SettingsGlyph(color: Color = MaterialTheme.colorScheme.onSurface) {
     Canvas(modifier = Modifier.size(22.dp)) {
         val radius = 2.dp.toPx()
         listOf(0.26f, 0.5f, 0.74f).forEach { fraction ->
             drawCircle(color = color, radius = radius, center = center.copy(x = size.width * fraction))
         }
+    }
+}
+
+private fun greeting(): String {
+    val hour = LocalTime.now().hour
+    return when (hour) {
+        in 5..11 -> "Good morning"
+        in 12..16 -> "Good afternoon"
+        in 17..22 -> "Good evening"
+        else -> "Quiet hours"
     }
 }
 

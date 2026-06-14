@@ -33,39 +33,50 @@ class ActionDetector {
         }
         return actions
             .suppressWeakNonTravelActionsForClearFlight(cleaned)
+            .map { it.withSafeGeneratedTitle(zoneId) }
             .distinctBy { it.type + it.title + it.dateTime }
     }
 
     private fun detectFlight(text: String, now: LocalDateTime, zoneId: ZoneId): DetectedAction? {
-        val flight = text.findFlightNumber() ?: return null
-        if (!text.hasFlightContext()) return null
-        val dateTime = findDateTime(text, now, zoneId)
-        val route = findFlightRoute(text)
-        val destination = route?.second ?: Regex("\\bto\\s+([A-Za-z ]+)(?:\\s+\\([A-Z]{3}\\))?", RegexOption.IGNORE_CASE)
-            .find(text)?.groupValues?.getOrNull(1)?.trim()?.ifBlank { null }
-        val title = when {
-            route != null -> "Flight from ${route.first} to ${route.second} ($flight)"
-            destination != null -> "Flight to $destination ($flight)"
-            else -> "Flight $flight"
-        }
+        val travel = extractTravelInfo(text, now, zoneId) ?: return null
+        if (!travel.hasTravelSignal) return null
+        val title = travel.buildTitle().rejectMarketingTitleOrRebuild(travel)
+        val confidenceScore = listOf(
+            travel.airlineName != null,
+            travel.flightNumber != null,
+            travel.hasRoute,
+            travel.departureDateTime != null,
+            travel.originAirport != null && travel.destinationAirport != null,
+        ).count { it } * 20
         return DetectedAction(
             id = UUID.randomUUID().toString(),
             type = "Travel",
             title = title,
-            dateTime = dateTime,
+            dateTime = travel.departureDateTime,
+            endDateTime = travel.arrivalDateTime,
             amount = null,
             currency = null,
-            location = route?.let { "${it.first} to ${it.second}" }
-                ?: Regex("([A-Z]{3}\\).+\\([A-Z]{3})").find(text)?.value
-                ?: destination,
-            confidence = confidence(dateTime != null, true, text.containsAny("departure", "booking confirmed")),
+            location = travel.routeDisplay,
+            confidence = when {
+                confidenceScore >= 80 -> "High confidence"
+                confidenceScore >= 40 -> "Review needed"
+                else -> "Low confidence"
+            },
             reminderSuggestions = listOf(
                 ReminderSuggestion("Check-in reminder 24h before", 24 * 60),
                 ReminderSuggestion("Airport reminder 3h before", 3 * 60),
+                ReminderSuggestion("Flight departure", 0),
             ),
             needsConfirmation = true,
-            rawTextEvidence = text.take(500),
+            rawTextEvidence = travel.summary(zoneId),
             calendarEvent = true,
+            airlineName = travel.airlineName,
+            flightNumber = travel.flightNumber,
+            originAirport = travel.originAirport,
+            destinationAirport = travel.destinationAirport,
+            originCity = travel.originCity,
+            destinationCity = travel.destinationCity,
+            arrivalDateTime = travel.arrivalDateTime,
         )
     }
 
@@ -271,6 +282,180 @@ class ActionDetector {
         return findTime(window)
     }
 
+    private data class TravelInfo(
+        val airlineName: String?,
+        val flightNumber: String?,
+        val originAirport: String?,
+        val destinationAirport: String?,
+        val originCity: String?,
+        val destinationCity: String?,
+        val departureDateTime: Long?,
+        val arrivalDateTime: Long?,
+    ) {
+        val hasRoute: Boolean = (originAirport != null || originCity != null) && (destinationAirport != null || destinationCity != null)
+        val hasTravelSignal: Boolean = airlineName != null || flightNumber != null || hasRoute || departureDateTime != null
+        val routeDisplay: String? = if (hasRoute) {
+            "${originCity ?: originAirport.orEmpty()}${originAirport?.let { " ($it)" }.orEmpty()} → ${destinationCity ?: destinationAirport.orEmpty()}${destinationAirport?.let { " ($it)" }.orEmpty()}"
+        } else {
+            null
+        }
+
+        fun buildTitle(): String = when {
+            airlineName != null && routeDisplay != null -> "$airlineName • ${routeDisplay.replace(Regex("\\s*\\([A-Z]{3}\\)"), "")}"
+            flightNumber != null && routeDisplay != null -> "$flightNumber • ${routeDisplay.replace(Regex("\\s*\\([A-Z]{3}\\)"), "")}"
+            routeDisplay != null -> routeDisplay.replace(Regex("\\s*\\([A-Z]{3}\\)"), "")
+            airlineName != null && flightNumber != null -> "$airlineName • $flightNumber"
+            flightNumber != null -> "Flight $flightNumber"
+            airlineName != null -> "$airlineName flight"
+            else -> "Flight reminder"
+        }
+
+        fun summary(zoneId: ZoneId): String = buildList {
+            val firstLine = when {
+                airlineName != null && flightNumber != null -> "$airlineName flight $flightNumber detected."
+                airlineName != null -> "$airlineName flight detected."
+                flightNumber != null -> "Flight $flightNumber detected."
+                else -> "Flight booking detected."
+            }
+            add(firstLine)
+            routeDisplay?.let { add("Flight from ${originCity ?: originAirport} (${originAirport.orEmpty()}) to ${destinationCity ?: destinationAirport} (${destinationAirport.orEmpty()}).") }
+            departureDateTime?.let {
+                add("")
+                add("Departure:")
+                add(LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(it), zoneId).format(DateTimeFormatter.ofPattern("d MMM yyyy HH:mm", Locale.ENGLISH)))
+            }
+            arrivalDateTime?.let {
+                add("")
+                add("Arrival:")
+                add(LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(it), zoneId).format(DateTimeFormatter.ofPattern("d MMM yyyy HH:mm", Locale.ENGLISH)))
+            }
+        }.joinToString("\n")
+    }
+
+    private data class AirlineInfo(
+        val name: String,
+        val codes: Set<String>,
+        val markers: Set<String>,
+    )
+
+    private data class AirportInfo(
+        val code: String,
+        val city: String,
+        val names: Set<String>,
+    )
+
+    private fun extractTravelInfo(text: String, now: LocalDateTime, zoneId: ZoneId): TravelInfo? {
+        val travelText = text.withoutMarketingLines()
+        val airline = travelText.findAirline()
+        val flightNumber = travelText.findFlightNumber()
+        val route = travelText.findStructuredRoute()
+        val departure = findDateTimeNearAny(travelText, now, zoneId, "departure", "depart", "flight", "boarding", "take off")
+            ?: findDateTime(travelText, now, zoneId)
+        val arrival = findDateTimeNearAny(travelText, now, zoneId, "arrival", "arrive", "landing")
+            ?: findSecondDateTime(travelText, now, zoneId, departure)
+
+        if (airline == null && flightNumber == null && route == null && departure == null) return null
+        val airlineName = airline?.name ?: flightNumber?.take(2)?.uppercase(Locale.US)?.let { code ->
+            airlines.firstOrNull { code in it.codes }?.name
+        }
+        return TravelInfo(
+            airlineName = airlineName,
+            flightNumber = flightNumber,
+            originAirport = route?.first?.code,
+            destinationAirport = route?.second?.code,
+            originCity = route?.first?.city,
+            destinationCity = route?.second?.city,
+            departureDateTime = departure,
+            arrivalDateTime = arrival,
+        )
+    }
+
+    private fun String.withoutMarketingLines(): String =
+        lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotBlank() && !it.isMarketingNoise() }
+            .joinToString("\n")
+
+    private fun String.isMarketingNoise(): Boolean =
+        marketingNoiseRegex.containsMatchIn(this)
+
+    private fun String.findAirline(): AirlineInfo? {
+        val clean = lowercase(Locale.US)
+        return airlines.firstOrNull { airline ->
+            airline.markers.any { clean.contains(it) }
+        }
+    }
+
+    private fun String.findStructuredRoute(): Pair<AirportInfo, AirportInfo>? {
+        val clean = withoutMarketingLines()
+        Regex("\\b([A-Z]{3})\\b\\s*(?:→|->|to|-|–|—)\\s*\\b([A-Z]{3})\\b", RegexOption.IGNORE_CASE)
+            .find(clean)?.let { match ->
+                val origin = airportForCode(match.groupValues[1])
+                val destination = airportForCode(match.groupValues[2])
+                if (origin != null && destination != null && origin != destination) return origin to destination
+            }
+
+        Regex("([A-Za-z][A-Za-z .'-]{1,34})\\s*\\(?([A-Z]{3})\\)?\\s*(?:→|->|to|-|–|—)\\s*([A-Za-z][A-Za-z .'-]{1,34})\\s*\\(?([A-Z]{3})\\)?", RegexOption.IGNORE_CASE)
+            .find(clean)?.let { match ->
+                val origin = airportForCode(match.groupValues[2])?.copy(city = match.groupValues[1].cleanTravelCity())
+                val destination = airportForCode(match.groupValues[4])?.copy(city = match.groupValues[3].cleanTravelCity())
+                if (origin != null && destination != null && origin != destination) return origin to destination
+            }
+
+        val codeMatches = Regex("\\b[A-Z]{3}\\b").findAll(clean)
+            .map { it.value.uppercase(Locale.US) }
+            .mapNotNull { airportForCode(it) }
+            .distinctBy { it.code }
+            .toList()
+        if (codeMatches.size >= 2) return codeMatches[0] to codeMatches[1]
+
+        val cityMatches = airports.filter { airport ->
+            airport.names.any { Regex("\\b${Regex.escape(it)}\\b", RegexOption.IGNORE_CASE).containsMatchIn(clean) }
+        }.distinctBy { it.code }
+        if (cityMatches.size >= 2) return cityMatches[0] to cityMatches[1]
+
+        return null
+    }
+
+    private fun airportForCode(code: String): AirportInfo? =
+        airports.firstOrNull { it.code.equals(code, ignoreCase = true) }
+
+    private fun String.cleanTravelCity(): String =
+        replace(Regex("\\b(from|to|departure|arrival|airport)\\b", RegexOption.IGNORE_CASE), "")
+            .trim(' ', '-', ':', '(', ')')
+            .ifBlank { this.trim() }
+
+    private fun findDateTimeNearAny(text: String, now: LocalDateTime, zoneId: ZoneId, vararg keywords: String): Long? {
+        keywords.forEach { keyword ->
+            val index = text.indexOf(keyword, ignoreCase = true)
+            if (index >= 0) {
+                val start = maxOf(0, index - 80)
+                val end = minOf(text.length, index + 180)
+                val window = text.substring(start, end)
+                val afterKeyword = text.substring(index, end)
+                val date = findAllDatesInTextOrder(afterKeyword, now.toLocalDate()).firstOrNull()
+                    ?: findAllDatesInTextOrder(window, now.toLocalDate()).firstOrNull()
+                    ?: findAllDatesInTextOrder(text, now.toLocalDate()).firstOrNull()
+                val time = findTime(afterKeyword) ?: findTime(window) ?: findTime(text)
+                if (date != null) {
+                    return LocalDateTime.of(date, time ?: LocalTime.of(9, 0)).atZone(zoneId).toInstant().toEpochMilli()
+                }
+            }
+        }
+        return null
+    }
+
+    private fun findSecondDateTime(text: String, now: LocalDateTime, zoneId: ZoneId, first: Long?): Long? {
+        val dates = findAllDatesInTextOrder(text, now.toLocalDate())
+        val times = Regex("\\b([01]?\\d|2[0-3])[:.]([0-5]\\d)\\b").findAll(text)
+            .map { LocalTime.of(it.groupValues[1].toInt(), it.groupValues[2].toInt()) }
+            .toList()
+        val date = dates.drop(1).firstOrNull() ?: dates.firstOrNull()
+        val time = times.drop(1).firstOrNull() ?: return null
+        val second = LocalDateTime.of(date ?: now.toLocalDate(), time).atZone(zoneId).toInstant().toEpochMilli()
+        return if (first == null || second > first) second else null
+    }
+
     private data class HotelStayDates(
         val checkIn: LocalDate?,
         val checkOut: LocalDate?,
@@ -464,25 +649,64 @@ class ActionDetector {
     private fun formatEpochDate(epochMillis: Long, zoneId: ZoneId): String =
         LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(epochMillis), zoneId).toLocalDate().format(shortDateFormatter)
 
+    private fun String.rejectMarketingTitleOrRebuild(travel: TravelInfo): String =
+        if (containsMarketingTitleText()) travel.buildTitle() else this
+
+    private fun String.containsMarketingTitleText(): Boolean =
+        marketingTitleRegex.containsMatchIn(this)
+
+    private fun DetectedAction.withSafeGeneratedTitle(zoneId: ZoneId): DetectedAction {
+        if (!title.containsMarketingTitleText()) return this
+        val rebuilt = when (type.lowercase()) {
+            "travel" -> {
+                val route = listOfNotNull(originCity, destinationCity).takeIf { it.size == 2 }?.joinToString(" → ")
+                when {
+                    airlineName != null && route != null -> "$airlineName • $route"
+                    flightNumber != null && route != null -> "$flightNumber • $route"
+                    route != null -> route
+                    flightNumber != null -> "Flight $flightNumber"
+                    airlineName != null -> "$airlineName flight"
+                    else -> "Flight reminder"
+                }
+            }
+            "bill" -> buildString {
+                append("Bill")
+                if (currency != null && amount != null) append(" $currency ${String.format(Locale.US, "%.2f", amount)}")
+                dateTime?.let { append(" due ${formatEpochDate(it, zoneId)}") }
+            }
+            "hotel" -> "Hotel reservation"
+            "appointment" -> "Appointment"
+            "delivery" -> "Delivery"
+            "documents" -> "Document reminder"
+            else -> "Reminder"
+        }
+        return copy(title = rebuilt)
+    }
+
     private fun List<DetectedAction>.suppressWeakNonTravelActionsForClearFlight(text: String): List<DetectedAction> {
         if (none { it.type == "Travel" } || !text.hasClearFlightConfirmation()) return this
         return filter { it.type == "Travel" }
     }
 
     private fun String.hasClearFlightConfirmation(): Boolean {
-        val hasAirline = containsAny("qatar airways", "airways", "airlines", "airline", "flight")
+        val travelText = withoutMarketingLines()
+        val hasAirline = travelText.findAirline() != null || travelText.containsAny("airways", "airlines", "airline", "flight")
         val hasFlightNumber = findFlightNumber() != null
         val hasTicketReference = Regex(
             "\\b(booking reference|booking confirmed|confirmation|flight number|ticket number|e-?ticket|boarding pass|PNR|reservation code)\\b",
             RegexOption.IGNORE_CASE,
-        ).containsMatchIn(this)
-        val hasRouteOrAirport = Regex("\\b[A-Z]{3}\\b").findAll(this).count() >= 2 ||
-            containsAny("airport", "departure", "arrival", "gate", "terminal", "boarding")
+        ).containsMatchIn(travelText)
+        val hasRouteOrAirport = travelText.findStructuredRoute() != null ||
+            travelText.containsAny("airport", "departure", "arrival", "gate", "terminal", "boarding")
         return hasFlightNumber && (hasAirline || hasTicketReference || hasRouteOrAirport)
     }
 
     private fun String.hasFlightContext(): Boolean =
-        containsAny("flight", "departure", "boarding", "booking", "airport", "airways", "airlines", "airline", "gate", "terminal", "pnr", "e-ticket", "ticket number", "flight number")
+        withoutMarketingLines().let {
+            it.findAirline() != null ||
+                it.findStructuredRoute() != null ||
+                it.containsAny("flight", "departure", "boarding", "booking", "airport", "airways", "airlines", "airline", "gate", "terminal", "pnr", "e-ticket", "ticket number", "flight number")
+        }
 
     private fun String.findFlightNumber(): String? {
         val knownAirlineCodes = setOf(
@@ -490,7 +714,7 @@ class ActionDetector {
             "IB", "AZ", "SQ", "CX", "QF", "AI", "6E", "FZ", "XY", "PC", "RJ", "MS", "ET", "SA", "MH", "TG", "JL", "NH",
         )
         return Regex("\\b([A-Z0-9]{2})\\s?([0-9]{2,4}[A-Z]?)\\b", RegexOption.IGNORE_CASE)
-            .findAll(this)
+            .findAll(withoutMarketingLines())
             .firstOrNull { match ->
                 match.groupValues[1].uppercase(Locale.US) in knownAirlineCodes
             }
@@ -504,5 +728,57 @@ class ActionDetector {
 
     private companion object {
         val shortDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.ENGLISH)
+        val marketingNoiseRegex = Regex(
+            "\\b(join|subscribe|download|claim|offer|promotion|insurance|rewards?|reward programme|privilege club|newsletter|book a hotel|rent a car|upgrade your seat|buy insurance|special offer|avios)\\b",
+            RegexOption.IGNORE_CASE,
+        )
+        val marketingTitleRegex = Regex(
+            "\\b(join|subscribe|download|claim|offer|promotion|insurance|rewards?|newsletter|avios|privilege club|legal|terms|footer)\\b",
+            RegexOption.IGNORE_CASE,
+        )
+        val airlines = listOf(
+            AirlineInfo("Qatar Airways", setOf("QR"), setOf("qatar airways", "qatarairways.com")),
+            AirlineInfo("Air France", setOf("AF"), setOf("air france", "airfrance.com")),
+            AirlineInfo("Lufthansa", setOf("LH"), setOf("lufthansa", "lufthansa.com")),
+            AirlineInfo("Ryanair", setOf("FR"), setOf("ryanair", "ryanair.com")),
+            AirlineInfo("easyJet", setOf("U2", "EJU"), setOf("easyjet", "easyjet.com")),
+            AirlineInfo("British Airways", setOf("BA"), setOf("british airways", "ba.com")),
+            AirlineInfo("Emirates", setOf("EK"), setOf("emirates", "emirates.com")),
+            AirlineInfo("Turkish Airlines", setOf("TK"), setOf("turkish airlines", "turkishairlines.com")),
+            AirlineInfo("Etihad", setOf("EY"), setOf("etihad", "etihad.com")),
+            AirlineInfo("KLM", setOf("KL"), setOf("klm", "klm.com")),
+            AirlineInfo("ITA Airways", setOf("AZ"), setOf("ita airways", "itaspa.com")),
+            AirlineInfo("Delta", setOf("DL"), setOf("delta", "delta.com")),
+            AirlineInfo("United", setOf("UA"), setOf("united airlines", "united.com")),
+            AirlineInfo("American Airlines", setOf("AA"), setOf("american airlines", "aa.com")),
+            AirlineInfo("Singapore Airlines", setOf("SQ"), setOf("singapore airlines", "singaporeair.com")),
+        )
+        val airports = listOf(
+            AirportInfo("DOH", "Doha", setOf("doha", "hamad")),
+            AirportInfo("CDG", "Paris", setOf("paris", "charles de gaulle")),
+            AirportInfo("ORY", "Paris", setOf("paris", "orly")),
+            AirportInfo("LHR", "London", setOf("london", "heathrow")),
+            AirportInfo("LGW", "London", setOf("london", "gatwick")),
+            AirportInfo("JFK", "New York", setOf("new york", "john f kennedy")),
+            AirportInfo("EWR", "New York", setOf("newark", "new york")),
+            AirportInfo("FCO", "Rome", setOf("rome", "fiumicino")),
+            AirportInfo("MXP", "Milan", setOf("milan", "malpensa")),
+            AirportInfo("LIN", "Milan", setOf("milan", "linate")),
+            AirportInfo("DXB", "Dubai", setOf("dubai")),
+            AirportInfo("AUH", "Abu Dhabi", setOf("abu dhabi")),
+            AirportInfo("IST", "Istanbul", setOf("istanbul")),
+            AirportInfo("AMS", "Amsterdam", setOf("amsterdam", "schiphol")),
+            AirportInfo("FRA", "Frankfurt", setOf("frankfurt")),
+            AirportInfo("MUC", "Munich", setOf("munich")),
+            AirportInfo("MAD", "Madrid", setOf("madrid")),
+            AirportInfo("BCN", "Barcelona", setOf("barcelona")),
+            AirportInfo("SIN", "Singapore", setOf("singapore", "changi")),
+            AirportInfo("ATL", "Atlanta", setOf("atlanta")),
+            AirportInfo("LAX", "Los Angeles", setOf("los angeles")),
+            AirportInfo("SFO", "San Francisco", setOf("san francisco")),
+            AirportInfo("ORD", "Chicago", setOf("chicago", "o'hare")),
+            AirportInfo("DFW", "Dallas", setOf("dallas", "fort worth")),
+            AirportInfo("MIA", "Miami", setOf("miami")),
+        )
     }
 }

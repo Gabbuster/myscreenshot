@@ -1,14 +1,20 @@
 package com.example.myscreenshot.ui
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
@@ -18,6 +24,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -25,22 +33,63 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.myscreenshot.calendar.CalendarIntentBuilder
 import com.example.myscreenshot.data.AppRepository
 import com.example.myscreenshot.data.Reminder
-import com.example.myscreenshot.ui.components.ConfidenceChip
 import com.example.myscreenshot.ui.components.ReminderTypeIcon
 import com.example.myscreenshot.ui.components.SourceThumbnail
+import com.example.myscreenshot.ui.theme.AppInk
+import com.example.myscreenshot.ui.theme.AppPaper
+import com.example.myscreenshot.ui.theme.AppScan
 import com.example.myscreenshot.ui.theme.MyScreenshotTheme
 import java.text.DateFormat
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Date
 import kotlinx.coroutines.launch
+
+private enum class ReminderCategory {
+    Travel,
+    Hotel,
+    Appointment,
+    Bill,
+    Document,
+    Delivery,
+    Unknown,
+}
+
+private data class DetailAction(
+    val label: String,
+    val kind: ActionKind,
+)
+
+private enum class ActionKind {
+    Calendar,
+    Maps,
+    Call,
+    Pay,
+    Track,
+    View,
+    Share,
+    Reminder,
+    CheckIn,
+    Airport,
+    Edit,
+    Delete,
+}
 
 @Composable
 fun ReminderDetailScreen(
@@ -54,6 +103,11 @@ fun ReminderDetailScreen(
         ReminderDetailContent(
             reminder = it,
             onBack = onBack,
+            onUpdate = { updated ->
+                scope.launch {
+                    repository.updateReminder(updated)
+                }
+            },
             onDelete = {
                 scope.launch {
                     repository.deleteReminder(it.id)
@@ -69,9 +123,15 @@ fun ReminderDetailContent(
     reminder: Reminder,
     onBack: () -> Unit,
     onDelete: () -> Unit,
+    onUpdate: (Reminder) -> Unit = {},
 ) {
     val context = LocalContext.current
+    val category = reminder.category()
+    var showScreenshot by remember { mutableStateOf(false) }
+    var showScreenshotViewer by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -80,7 +140,11 @@ fun ReminderDetailContent(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 IconButton(onClick = onBack) {
                     Text("<", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 }
@@ -88,49 +152,86 @@ fun ReminderDetailContent(
             }
         }
         item {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .shadow(8.dp, RoundedCornerShape(26.dp), ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(26.dp))
-                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(26.dp))
-                    .padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ReminderTypeIcon(reminder.type)
-                    SourceThumbnail(reminder.sourceType, sourceUri = reminder.sourceImageUri)
-                }
-                Text(reminder.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text(reminder.type, color = MaterialTheme.colorScheme.primary)
-                reminder.dateTime?.let {
-                    Text(DateFormat.getDateTimeInstance(DateFormat.FULL, DateFormat.SHORT).format(Date(it)))
-                }
-                reminder.amount?.let { Text("${reminder.currency.orEmpty()} ${String.format("%.2f", it)}") }
-                reminder.location?.let { Text(it) }
-                ConfidenceChip(reminder.confidence)
-                Text("Notes", fontWeight = FontWeight.SemiBold)
-                Text(reminder.notes.ifBlank { "No notes" })
-                Text("Detected text", fontWeight = FontWeight.SemiBold)
-                Text(reminder.ocrText.ifBlank { "No detected text saved" }, maxLines = 6)
-                if (reminder.type in listOf("Travel", "Appointment")) {
-                    Button(
-                        onClick = { context.startActivity(CalendarIntentBuilder.build(reminder)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
-                        ),
-                        shape = RoundedCornerShape(18.dp),
-                    ) {
-                        Text("Add to calendar")
+            TopReminderCard(
+                reminder = reminder,
+                category = category,
+                onClick = { showEditDialog = true },
+            )
+        }
+        item {
+            InfoCard(title = "AI Summary") {
+                Text(
+                    getAISummaryText(category),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+            }
+        }
+        item {
+            InfoCard(title = "Smart reminders") {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    getSmartReminderSuggestions(category).forEach {
+                        TimelineRow(text = it)
                     }
                 }
+            }
+        }
+        item {
+            SmartActionsRow(
+                actions = getPrimaryActions(category),
+                reminder = reminder,
+                onAction = { action ->
+                    when (action.kind) {
+                        ActionKind.Calendar -> if (reminder.dateTime != null) {
+                            context.startActivity(CalendarIntentBuilder.build(reminder))
+                        }
+                        ActionKind.Maps -> reminder.location?.takeIf { it.isNotBlank() }?.let {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=${Uri.encode(it)}")))
+                        }
+                        ActionKind.Share -> {
+                            val shareIntent = Intent(Intent.ACTION_SEND)
+                                .setType("text/plain")
+                                .putExtra(Intent.EXTRA_TEXT, reminder.title)
+                            context.startActivity(Intent.createChooser(shareIntent, "Share reminder"))
+                        }
+                        ActionKind.Delete -> showDeleteDialog = true
+                        else -> Unit
+                    }
+                },
+            )
+        }
+        item {
+            CollapsedSection(
+                title = "Original screenshot",
+                expanded = showScreenshot,
+                onToggle = { showScreenshot = !showScreenshot },
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SourceThumbnail(
+                        sourceType = reminder.sourceType,
+                        sourceUri = reminder.sourceImageUri,
+                        contentScale = ContentScale.Fit,
+                        thumbnailSize = 720,
+                        showSheen = false,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(0.72f)
+                            .clickable { showScreenshotViewer = true },
+                    )
+                    Text(
+                        "Tap to view full screenshot",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
+            }
+        }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedButton(
-                    onClick = {},
-                    enabled = false,
+                    onClick = { showEditDialog = true },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
+                    shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
                 ) {
                     Text("Edit")
@@ -138,7 +239,7 @@ fun ReminderDetailContent(
                 OutlinedButton(
                     onClick = { showDeleteDialog = true },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
+                    shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                 ) {
                     Text("Delete")
@@ -146,6 +247,7 @@ fun ReminderDetailContent(
             }
         }
     }
+
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
@@ -166,6 +268,501 @@ fun ReminderDetailContent(
             },
         )
     }
+
+    if (showEditDialog) {
+        EditReminderDialog(
+            reminder = reminder,
+            onDismiss = { showEditDialog = false },
+            onSave = { updated ->
+                onUpdate(updated)
+                showEditDialog = false
+            },
+        )
+    }
+
+    if (showScreenshotViewer) {
+        Dialog(
+            onDismissRequest = { showScreenshotViewer = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.94f))
+                    .padding(14.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                SourceThumbnail(
+                    sourceType = reminder.sourceType,
+                    sourceUri = reminder.sourceImageUri,
+                    contentScale = ContentScale.Fit,
+                    thumbnailSize = 1400,
+                    showSheen = false,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(0.62f),
+                )
+                TextButton(
+                    onClick = { showScreenshotViewer = false },
+                    modifier = Modifier.align(Alignment.TopEnd),
+                ) {
+                    Text("Close", color = Color.White)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EditReminderDialog(
+    reminder: Reminder,
+    onDismiss: () -> Unit,
+    onSave: (Reminder) -> Unit,
+) {
+    var title by remember(reminder.id) { mutableStateOf(reminder.title) }
+    var type by remember(reminder.id) { mutableStateOf(reminder.type) }
+    var startText by remember(reminder.id) { mutableStateOf(reminder.dateTime.toEditableDateTime()) }
+    var endText by remember(reminder.id) { mutableStateOf(reminder.endDateTime.toEditableDateTime()) }
+    var location by remember(reminder.id) { mutableStateOf(reminder.location.orEmpty()) }
+    var amount by remember(reminder.id) { mutableStateOf(reminder.amount?.let { String.format("%.2f", it) }.orEmpty()) }
+    var currency by remember(reminder.id) { mutableStateOf(reminder.currency.orEmpty()) }
+    var notes by remember(reminder.id) { mutableStateOf(reminder.notes) }
+    var errorText by remember { mutableStateOf<String?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit reminder") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                TextField(value = title, onValueChange = { title = it }, singleLine = true, label = { Text("Title") })
+                TextField(value = type, onValueChange = { type = it }, singleLine = true, label = { Text("Category") })
+                TextField(
+                    value = startText,
+                    onValueChange = { startText = it },
+                    singleLine = true,
+                    label = { Text("Starts") },
+                    supportingText = { Text("YYYY-MM-DD HH:mm") },
+                )
+                TextField(
+                    value = endText,
+                    onValueChange = { endText = it },
+                    singleLine = true,
+                    label = { Text("Ends") },
+                    supportingText = { Text("Optional") },
+                )
+                TextField(value = location, onValueChange = { location = it }, singleLine = true, label = { Text("Place or details") })
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextField(value = amount, onValueChange = { amount = it }, singleLine = true, label = { Text("Amount") }, modifier = Modifier.weight(1f))
+                    TextField(value = currency, onValueChange = { currency = it }, singleLine = true, label = { Text("Currency") }, modifier = Modifier.weight(1f))
+                }
+                TextField(value = notes, onValueChange = { notes = it }, label = { Text("Notes") }, minLines = 2)
+                errorText?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val parsedStart = startText.parseEditableDateTimeOrNull()
+                    val parsedEnd = endText.parseEditableDateTimeOrNull()
+                    val parsedAmount = amount.trim().takeIf { it.isNotBlank() }?.toDoubleOrNull()
+                    when {
+                        title.isBlank() -> errorText = "Title is required."
+                        startText.isNotBlank() && parsedStart == null -> errorText = "Use YYYY-MM-DD HH:mm for Starts."
+                        endText.isNotBlank() && parsedEnd == null -> errorText = "Use YYYY-MM-DD HH:mm for Ends."
+                        amount.isNotBlank() && parsedAmount == null -> errorText = "Amount must be a number."
+                        else -> onSave(
+                            reminder.copy(
+                                title = title.trim(),
+                                type = type.trim().ifBlank { reminder.type },
+                                dateTime = parsedStart,
+                                endDateTime = parsedEnd,
+                                location = location.trim().ifBlank { null },
+                                amount = parsedAmount,
+                                currency = currency.trim().uppercase().ifBlank { null },
+                                notes = notes.trim(),
+                            ),
+                        )
+                    }
+                },
+            ) {
+                Text("Save changes")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+    )
+}
+
+@Composable
+private fun TopReminderCard(
+    reminder: Reminder,
+    category: ReminderCategory,
+    onClick: () -> Unit,
+) {
+    val secondaryInfo = reminder.secondaryInformation(category)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(8.dp, RoundedCornerShape(28.dp), ambientColor = AppInk.copy(alpha = 0.08f))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(28.dp))
+            .clickable(onClick = onClick)
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top,
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                ReminderTypeIcon(reminder.type)
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(
+                        getCategoryLabel(category),
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                    Text("AI reminder", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+        Text(
+            reminder.title,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            reminder.mainDateText(),
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier
+                .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(16.dp))
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+        )
+        if (secondaryInfo.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                secondaryInfo.take(4).forEach { DetailLine(it) }
+            }
+        }
+        Text("Tap to edit details", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
+    }
+}
+
+@Composable
+private fun DetailLine(text: String) {
+    val parts = text.split(":", limit = 2)
+    if (parts.size == 1) {
+        Text(
+            text,
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+        return
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top,
+    ) {
+        Text(
+            parts.first().trim(),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.weight(0.40f),
+        )
+        Text(
+            parts[1].trim(),
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.weight(0.60f),
+        )
+    }
+}
+
+@Composable
+private fun InfoCard(title: String, content: @Composable () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(3.dp, RoundedCornerShape(24.dp), ambientColor = AppInk.copy(alpha = 0.05f))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(24.dp))
+            .padding(18.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        content()
+    }
+}
+
+@Composable
+private fun TimelineRow(text: String) {
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .background(AppScan, RoundedCornerShape(50)),
+        )
+        Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun SmartActionsRow(
+    actions: List<DetailAction>,
+    reminder: Reminder,
+    onAction: (DetailAction) -> Unit,
+) {
+    InfoCard(title = "Actions") {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            actions.chunked(2).forEach { rowActions ->
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    rowActions.forEach { action ->
+                        Button(
+                            onClick = { onAction(action) },
+                            enabled = action.isAvailable(reminder),
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(16.dp),
+                            contentPadding = PaddingValues(vertical = 13.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
+                        ) {
+                            Text(action.label)
+                        }
+                    }
+                    if (rowActions.size == 1) {
+                        Box(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CollapsedSection(
+    title: String,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(AppPaper, RoundedCornerShape(22.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.72f), RoundedCornerShape(22.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        TextButton(onClick = onToggle, modifier = Modifier.fillMaxWidth()) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(title, fontWeight = FontWeight.SemiBold)
+                Text(if (expanded) "Hide" else "Show")
+            }
+        }
+        if (expanded) {
+            content()
+        }
+    }
+}
+
+private fun Reminder.category(): ReminderCategory = when (type.trim().lowercase()) {
+    "travel", "flight" -> ReminderCategory.Travel
+    "hotel" -> ReminderCategory.Hotel
+    "appointment" -> ReminderCategory.Appointment
+    "bill", "payment" -> ReminderCategory.Bill
+    "document", "documents" -> ReminderCategory.Document
+    "delivery", "package" -> ReminderCategory.Delivery
+    else -> ReminderCategory.Unknown
+}
+
+private fun getCategoryLabel(category: ReminderCategory): String = when (category) {
+    ReminderCategory.Travel -> "TRAVEL"
+    ReminderCategory.Hotel -> "HOTEL"
+    ReminderCategory.Appointment -> "APPOINTMENT"
+    ReminderCategory.Bill -> "BILL"
+    ReminderCategory.Document -> "DOCUMENT"
+    ReminderCategory.Delivery -> "DELIVERY"
+    ReminderCategory.Unknown -> "REMINDER"
+}
+
+private fun getPrimaryActions(category: ReminderCategory): List<DetailAction> = when (category) {
+    ReminderCategory.Travel -> listOf(
+        DetailAction("Add to Calendar", ActionKind.Calendar),
+        DetailAction("Check-in", ActionKind.CheckIn),
+        DetailAction("Open Airport", ActionKind.Airport),
+    )
+    ReminderCategory.Hotel -> listOf(
+        DetailAction("Add to Calendar", ActionKind.Calendar),
+        DetailAction("Open Maps", ActionKind.Maps),
+        DetailAction("Call Hotel", ActionKind.Call),
+    )
+    ReminderCategory.Appointment -> listOf(
+        DetailAction("Add to Calendar", ActionKind.Calendar),
+        DetailAction("Open Maps", ActionKind.Maps),
+        DetailAction("Call", ActionKind.Call),
+    )
+    ReminderCategory.Bill -> listOf(
+        DetailAction("Pay", ActionKind.Pay),
+        DetailAction("Add Reminder", ActionKind.Reminder),
+        DetailAction("View Bill", ActionKind.View),
+    )
+    ReminderCategory.Document -> listOf(
+        DetailAction("Add Reminder", ActionKind.Reminder),
+        DetailAction("Open Document", ActionKind.View),
+        DetailAction("Share", ActionKind.Share),
+    )
+    ReminderCategory.Delivery -> listOf(
+        DetailAction("Track", ActionKind.Track),
+        DetailAction("Open Address", ActionKind.Maps),
+        DetailAction("Add Reminder", ActionKind.Reminder),
+    )
+    ReminderCategory.Unknown -> listOf(
+        DetailAction("Add Reminder", ActionKind.Reminder),
+        DetailAction("Edit", ActionKind.Edit),
+        DetailAction("Delete", ActionKind.Delete),
+    )
+}
+
+private fun getSmartReminderSuggestions(category: ReminderCategory): List<String> = when (category) {
+    ReminderCategory.Travel -> listOf("Check-in opens", "Leave for airport", "Flight departure")
+    ReminderCategory.Hotel -> listOf("Prepare documents", "Check-in reminder", "Check-out reminder")
+    ReminderCategory.Appointment -> listOf("Reminder 1 day before", "Reminder 2 hours before", "Leave on time")
+    ReminderCategory.Bill -> listOf("Due soon", "Due tomorrow", "Due today")
+    ReminderCategory.Document -> listOf("Renew 6 months before", "Renew 3 months before", "Expiry warning")
+    ReminderCategory.Delivery -> listOf("Delivery expected", "Package arriving today", "Follow up if delayed")
+    ReminderCategory.Unknown -> listOf("Review reminder", "Act on time")
+}
+
+private fun getAISummaryText(category: ReminderCategory): String = when (category) {
+    ReminderCategory.Travel -> "Flight booking detected."
+    ReminderCategory.Hotel -> "Hotel reservation detected."
+    ReminderCategory.Appointment -> "Appointment detected."
+    ReminderCategory.Bill -> "Bill payment detected."
+    ReminderCategory.Document -> "Document expiry detected."
+    ReminderCategory.Delivery -> "Delivery notification detected."
+    ReminderCategory.Unknown -> "Reminder detected."
+}
+
+private fun Reminder.secondaryInformation(category: ReminderCategory): List<String> {
+    val text = listOf(title, notes, ocrText).joinToString("\n")
+    return when (category) {
+        ReminderCategory.Travel -> listOfNotNull(
+            extractRoute(text)?.let { "Route: $it" },
+            extractFlightNumber(text)?.let { "Flight: $it" },
+            extractLabeledValue(text, listOf("terminal", "gate", "seat"))?.let { "Details: $it" },
+            location?.takeIf { it.isNotBlank() }?.let { "Airport: $it" },
+        )
+        ReminderCategory.Hotel -> listOfNotNull(
+            "Hotel: $title",
+            dateTime?.let { "Check-in: ${formatDate(it)}" },
+            endDateTime?.let { "Check-out: ${formatDate(it)}" },
+            location?.takeIf { it.isNotBlank() }?.let { "Address: $it" },
+        )
+        ReminderCategory.Appointment -> listOfNotNull(
+            extractLabeledValue(text, listOf("doctor", "company", "person", "with"))?.let { "With: $it" },
+            location?.takeIf { it.isNotBlank() }?.let { "Location: $it" },
+        )
+        ReminderCategory.Bill -> listOfNotNull(
+            amount?.let { "Amount: ${currency.orEmpty()} ${String.format("%.2f", it)}" },
+            dateTime?.let { "Due: ${formatDate(it)}" },
+            extractLabeledValue(text, listOf("provider", "merchant", "company"))?.let { "Provider: $it" },
+        )
+        ReminderCategory.Document -> listOfNotNull(
+            "Document: $title",
+            dateTime?.let { "Expiry: ${formatDate(it)}" },
+            extractLabeledValue(text, listOf("owner", "name"))?.let { "Owner: $it" },
+            extractReference(text)?.let { "Reference: $it" },
+        )
+        ReminderCategory.Delivery -> listOfNotNull(
+            "Package: $title",
+            dateTime?.let { "Expected: ${formatDate(it)}" },
+            extractTrackingNumber(text)?.let { "Tracking: $it" },
+            location?.takeIf { it.isNotBlank() }?.let { "Address: $it" },
+        )
+        ReminderCategory.Unknown -> listOfNotNull(
+            amount?.let { "Amount: ${currency.orEmpty()} ${String.format("%.2f", it)}" },
+            location?.takeIf { it.isNotBlank() },
+            notes.takeIf { it.isNotBlank() },
+        )
+    }.ifEmpty {
+        listOf("No extra details detected.")
+    }
+}
+
+private fun Reminder.mainDateText(): String =
+    dateTime?.let { formatDate(it) } ?: "No date or time detected"
+
+private fun DetailAction.isAvailable(reminder: Reminder): Boolean = when (kind) {
+    ActionKind.Calendar -> reminder.dateTime != null
+    ActionKind.Maps -> reminder.location?.isNotBlank() == true
+    ActionKind.Share -> true
+    ActionKind.Delete -> true
+    else -> false
+}
+
+private fun formatDate(value: Long): String =
+    DateFormat.getDateTimeInstance(DateFormat.FULL, DateFormat.SHORT).format(Date(value))
+
+private val editableDateTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+
+private fun Long?.toEditableDateTime(): String =
+    this?.let {
+        LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(it), ZoneId.systemDefault())
+            .format(editableDateTimeFormatter)
+    }.orEmpty()
+
+private fun String.parseEditableDateTimeOrNull(): Long? {
+    val clean = trim()
+    if (clean.isBlank()) return null
+    return runCatching {
+        LocalDateTime.parse(clean, editableDateTimeFormatter)
+            .atZone(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+    }.getOrNull()
+}
+
+private fun extractRoute(text: String): String? =
+    Regex("""\b([A-Z]{3})\s*(?:→|->|-|to)\s*([A-Z]{3})\b""").find(text)?.let {
+        "${it.groupValues[1]} → ${it.groupValues[2]}"
+    }
+
+private fun extractFlightNumber(text: String): String? =
+    Regex("""\b[A-Z]{2}\s?\d{2,4}\b""").find(text)?.value
+
+private fun extractTrackingNumber(text: String): String? =
+    Regex("""\b[A-Z0-9]{10,22}\b""").find(text)?.value
+
+private fun extractReference(text: String): String? =
+    Regex("""(?i)\b(?:ref|reference|document no|number)[:\s#-]+([A-Z0-9-]{4,24})""")
+        .find(text)
+        ?.groupValues
+        ?.getOrNull(1)
+
+private fun extractLabeledValue(text: String, labels: List<String>): String? {
+    labels.forEach { label ->
+        Regex("""(?im)\b$label[:\s-]+([^\n,]+)""")
+            .find(text)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?.let { return it.take(48) }
+    }
+    return null
 }
 
 @Preview(showBackground = true)

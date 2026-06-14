@@ -30,20 +30,20 @@ fun FilterChipRow(
                 selected = selected == filter,
                 onClick = { onSelected(filter) },
                 label = { Text(filter, fontWeight = FontWeight.SemiBold) },
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(8.dp),
                 border = FilterChipDefaults.filterChipBorder(
                     enabled = true,
                     selected = selected == filter,
                     borderColor = MaterialTheme.colorScheme.outline,
                     selectedBorderColor = MaterialTheme.colorScheme.primary,
                     borderWidth = 1.dp,
-                    selectedBorderWidth = 0.dp,
+                    selectedBorderWidth = 1.dp,
                 ),
                 colors = FilterChipDefaults.filterChipColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                     labelColor = MaterialTheme.colorScheme.onSurface,
-                    selectedContainerColor = MaterialTheme.colorScheme.primary,
-                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 ),
             )
         }

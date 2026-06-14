@@ -8,17 +8,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFFFF7A4C),
-    onPrimary = AppInk,
-    primaryContainer = Color(0xFF3B1820),
-    onPrimaryContainer = Color(0xFFFFD7C7),
-    secondary = Color(0xFFFFB15E),
+    primary = Color(0xFFFFC24A),
+    onPrimary = Color(0xFF11161F),
+    primaryContainer = Color(0xFF123A35),
+    onPrimaryContainer = Color(0xFFDDEFEA),
+    secondary = Color(0xFF6FD0BF),
     onSecondary = AppInk,
-    secondaryContainer = Color(0xFF4A2A0C),
-    onSecondaryContainer = Color(0xFFFFDDB7),
-    tertiary = AppCoral,
-    tertiaryContainer = Color(0xFF5A211A),
-    onTertiaryContainer = Color(0xFFFFE6E1),
+    secondaryContainer = Color(0xFF1B3F39),
+    onSecondaryContainer = Color(0xFFDDEFEA),
+    tertiary = Color(0xFFE38A70),
+    tertiaryContainer = Color(0xFF4D2119),
+    onTertiaryContainer = Color(0xFFFFD8CC),
     background = ColorTokens.DarkBackground,
     onBackground = ColorTokens.DarkText,
     surface = ColorTokens.DarkSurface,
@@ -32,17 +32,17 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = AppInk,
+    primary = AppProof,
     onPrimary = Color.White,
-    primaryContainer = AppPeach,
-    onPrimaryContainer = AppInk,
-    secondary = AppOrange,
+    primaryContainer = AppProofSoft,
+    onPrimaryContainer = Color(0xFF06362F),
+    secondary = AppScan,
     onSecondary = AppInk,
-    secondaryContainer = Color(0xFFFFE7C7),
-    onSecondaryContainer = Color(0xFF35200A),
+    secondaryContainer = AppPeach,
+    onSecondaryContainer = Color(0xFF3E2A04),
     tertiary = AppCoral,
-    tertiaryContainer = Color(0xFFFFE4E8),
-    onTertiaryContainer = Color(0xFF5B111B),
+    tertiaryContainer = Color(0xFFFFE1D8),
+    onTertiaryContainer = Color(0xFF5B1C12),
     background = AppLightBackground,
     onBackground = AppDarkText,
     surface = AppCard,
@@ -75,10 +75,10 @@ fun MyScreenshotTheme(
 }
 
 private object ColorTokens {
-    val DarkBackground = androidx.compose.ui.graphics.Color(0xFF070B12)
-    val DarkSurface = androidx.compose.ui.graphics.Color(0xFF111925)
-    val DarkSurfaceVariant = androidx.compose.ui.graphics.Color(0xFF1B2430)
-    val DarkText = androidx.compose.ui.graphics.Color(0xFFF4F2EF)
-    val DarkMutedText = androidx.compose.ui.graphics.Color(0xFFADB3BA)
-    val DarkBorder = androidx.compose.ui.graphics.Color(0xFF303947)
+    val DarkBackground = androidx.compose.ui.graphics.Color(0xFF0C1116)
+    val DarkSurface = androidx.compose.ui.graphics.Color(0xFF151B22)
+    val DarkSurfaceVariant = androidx.compose.ui.graphics.Color(0xFF20272F)
+    val DarkText = androidx.compose.ui.graphics.Color(0xFFF8F3E7)
+    val DarkMutedText = androidx.compose.ui.graphics.Color(0xFFB8B0A1)
+    val DarkBorder = androidx.compose.ui.graphics.Color(0xFF39352D)
 }

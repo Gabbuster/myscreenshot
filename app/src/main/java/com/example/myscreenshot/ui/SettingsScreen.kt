@@ -61,7 +61,7 @@ fun SettingsScreen(
                     Text("Dark mode")
                     Switch(checked = darkMode, onCheckedChange = onDarkModeChange)
                 }
-                Text("Uses a darker version of the new soft workspace palette.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Uses the darker capture desk palette.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         item {
@@ -88,7 +88,7 @@ fun SettingsScreen(
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary,
                     ),
-                    shape = RoundedCornerShape(18.dp),
+                    shape = RoundedCornerShape(8.dp),
                 ) { Text("Calendar integration") }
                 Text("Calendar events open in your calendar app for confirmation.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -115,7 +115,7 @@ fun SettingsScreen(
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary,
                     ),
-                    shape = RoundedCornerShape(18.dp),
+                    shape = RoundedCornerShape(8.dp),
                 ) { Text("Export local backup") }
                 TextButton(onClick = {}) { Text("Clear all data") }
             }
@@ -128,9 +128,9 @@ private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(6.dp, RoundedCornerShape(22.dp), ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.06f))
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(22.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(22.dp))
+            .shadow(3.dp, RoundedCornerShape(8.dp), ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
         content = content,

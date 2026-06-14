@@ -2,18 +2,24 @@ package com.example.myscreenshot.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val AppInk = Color(0xFF07111F)
-val AppInkSoft = Color(0xFF172231)
-val AppCanvas = Color(0xFFEDEDED)
-val AppSurface = Color(0xFFF9F9F8)
-val AppSurfaceRaised = Color(0xFFFFFFFF)
-val AppMuted = Color(0xFF8B919A)
-val AppLine = Color(0xFFE0E0DE)
-val AppOrange = Color(0xFFFFA33D)
-val AppCoral = Color(0xFFFF4B5F)
-val AppPeach = Color(0xFFFFEEE3)
-val AppSuccess = Color(0xFF4EAD38)
-val AppError = Color(0xFFDC2626)
+val AppInk = Color(0xFF11161F)
+val AppInkSoft = Color(0xFF29313D)
+val AppCanvas = Color(0xFFF3F0E8)
+val AppSurface = Color(0xFFF9F7F1)
+val AppSurfaceRaised = Color(0xFFFFFDF8)
+val AppMuted = Color(0xFF6E756F)
+val AppLine = Color(0xFFD9D2C4)
+val AppOrange = Color(0xFFF2A23A)
+val AppCoral = Color(0xFFC95C45)
+val AppPeach = Color(0xFFFFE7B6)
+val AppSuccess = Color(0xFF197A6B)
+val AppError = Color(0xFFB83A2E)
+
+val AppProof = Color(0xFF197A6B)
+val AppProofSoft = Color(0xFFDDEFEA)
+val AppPaper = Color(0xFFFFFDF8)
+val AppLedger = Color(0xFFE9E2D2)
+val AppScan = Color(0xFFFFC24A)
 
 val AppBlue = AppInk
 val AppDarkText = AppInk
