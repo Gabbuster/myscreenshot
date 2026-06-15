@@ -11,7 +11,7 @@ import com.example.myscreenshot.R
 @Composable
 fun AppLogo(modifier: Modifier = Modifier.size(72.dp)) {
     Image(
-        painter = painterResource(R.drawable.screenshot_reminder_logo),
+        painter = painterResource(R.drawable.snappy_the_screenshot_fox),
         contentDescription = "Snappy, the Screen4U fox mascot",
         modifier = modifier,
     )
