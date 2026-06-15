@@ -86,7 +86,7 @@ fun AppNavHost(
 
     fun startScreenshotBackfill() {
         scope.launch {
-            val inputs = ScreenshotBackfillScanner(context).findRecentScreenshots(monthsBack = 30)
+            val inputs = ScreenshotBackfillScanner(context).findRecentScreenshots(daysBack = 30)
             if (inputs.isEmpty()) return@launch
             sharedInput = inputs.first()
             pendingBatchInputs = inputs.drop(1)

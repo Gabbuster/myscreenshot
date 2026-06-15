@@ -50,12 +50,14 @@ fun ReminderCard(
             .padding(12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            ReminderThumbnailWithBookmark(
-                reminder = reminder,
-                onTagClick = onTagClick,
-            )
+            ReminderThumbnail(reminder = reminder)
             Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 Text(
                     reminder.title,
                     color = if (isPast) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
@@ -87,6 +89,11 @@ fun ReminderCard(
                 PassedStamp()
             }
         }
+        BookmarkButton(
+            tagColor = reminder.tagColor,
+            onClick = { onTagClick(reminder) },
+            modifier = Modifier.align(Alignment.TopEnd),
+        )
     }
 }
 
@@ -107,9 +114,8 @@ private fun Reminder.dateLabel(start: Long): String {
 }
 
 @Composable
-private fun ReminderThumbnailWithBookmark(
+private fun ReminderThumbnail(
     reminder: Reminder,
-    onTagClick: (Reminder) -> Unit,
 ) {
     Box(modifier = Modifier.size(72.dp)) {
         SourceThumbnail(
@@ -118,11 +124,6 @@ private fun ReminderThumbnailWithBookmark(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .size(64.dp),
-        )
-        BookmarkButton(
-            tagColor = reminder.tagColor,
-            onClick = { onTagClick(reminder) },
-            modifier = Modifier.align(Alignment.TopEnd),
         )
     }
 }

@@ -9,9 +9,9 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 
 class ScreenshotBackfillScanner(private val context: Context) {
-    suspend fun findRecentScreenshots(monthsBack: Long = 30): List<SharedInput> = withContext(Dispatchers.IO) {
+    suspend fun findRecentScreenshots(daysBack: Long = 30): List<SharedInput> = withContext(Dispatchers.IO) {
         val sinceSeconds = LocalDateTime.now()
-            .minusMonths(monthsBack)
+            .minusDays(daysBack)
             .atZone(ZoneId.systemDefault())
             .toEpochSecond()
         val projection = arrayOf(
