@@ -1,7 +1,10 @@
 package com.example.myscreenshot.navigation
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -23,11 +26,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -35,6 +40,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.myscreenshot.data.AppRepository
+import com.example.myscreenshot.ocr.ScreenshotBackfillScanner
 import com.example.myscreenshot.ocr.SharedInput
 import com.example.myscreenshot.ui.EmptyStateScreen
 import com.example.myscreenshot.ui.HomeScreen
@@ -42,6 +48,7 @@ import com.example.myscreenshot.ui.ReminderDetailScreen
 import com.example.myscreenshot.ui.ReviewSaveScreen
 import com.example.myscreenshot.ui.SettingsScreen
 import java.io.File
+import kotlinx.coroutines.launch
 
 @Composable
 fun AppNavHost(
@@ -53,10 +60,41 @@ fun AppNavHost(
 ) {
     val context = LocalContext.current
     val navController = rememberNavController()
+    val scope = rememberCoroutineScope()
     val startDestination = if (initialSharedInput == null) Routes.HOME else Routes.REVIEW
     var sharedInput by remember { mutableStateOf(initialSharedInput) }
     var showImportSheet by remember { mutableStateOf(false) }
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
+    var pendingBatchInputs by remember { mutableStateOf<List<SharedInput>>(emptyList()) }
+
+    fun openNextBatchInput(): Boolean {
+        val next = pendingBatchInputs.firstOrNull() ?: return false
+        sharedInput = next
+        pendingBatchInputs = pendingBatchInputs.drop(1)
+        navController.navigate(Routes.REVIEW) {
+            launchSingleTop = true
+        }
+        return true
+    }
+
+    fun openHome() {
+        navController.navigate(Routes.HOME) {
+            popUpTo(Routes.HOME) { inclusive = false }
+            launchSingleTop = true
+        }
+    }
+
+    fun startScreenshotBackfill() {
+        scope.launch {
+            val inputs = ScreenshotBackfillScanner(context).findRecentScreenshots(monthsBack = 30)
+            if (inputs.isEmpty()) return@launch
+            sharedInput = inputs.first()
+            pendingBatchInputs = inputs.drop(1)
+            navController.navigate(Routes.REVIEW) {
+                launchSingleTop = true
+            }
+        }
+    }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia(),
@@ -82,6 +120,13 @@ fun AppNavHost(
             }
         }
         pendingCameraUri = null
+    }
+    val screenshotPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            startScreenshotBackfill()
+        }
     }
     val goBackOrHome = {
         if (!navController.popBackStack()) {
@@ -123,10 +168,7 @@ fun AppNavHost(
                 useSample = false,
                 onBack = goBackOrHome,
                 onSaved = {
-                    navController.navigate(Routes.HOME) {
-                        popUpTo(Routes.HOME) { inclusive = false }
-                        launchSingleTop = true
-                    }
+                    if (!openNextBatchInput()) openHome()
                 },
             )
         }
@@ -137,10 +179,7 @@ fun AppNavHost(
                 useSample = true,
                 onBack = goBackOrHome,
                 onSaved = {
-                    navController.navigate(Routes.HOME) {
-                        popUpTo(Routes.HOME) { inclusive = false }
-                        launchSingleTop = true
-                    }
+                    openHome()
                 },
             )
         }
@@ -181,6 +220,19 @@ fun AppNavHost(
                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                 )
             },
+            onScanRecentScreenshots = {
+                showImportSheet = false
+                val permission = if (Build.VERSION.SDK_INT >= 33) {
+                    Manifest.permission.READ_MEDIA_IMAGES
+                } else {
+                    Manifest.permission.READ_EXTERNAL_STORAGE
+                }
+                if (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED) {
+                    startScreenshotBackfill()
+                } else {
+                    screenshotPermissionLauncher.launch(permission)
+                }
+            },
         )
     }
 }
@@ -191,6 +243,7 @@ private fun ImportImageSheet(
     onDismiss: () -> Unit,
     onCamera: () -> Unit,
     onPhotoLibrary: () -> Unit,
+    onScanRecentScreenshots: () -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -224,6 +277,14 @@ private fun ImportImageSheet(
                 contentPadding = PaddingValues(vertical = 15.dp),
             ) {
                 Text("Choose from photos")
+            }
+            OutlinedButton(
+                onClick = onScanRecentScreenshots,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                contentPadding = PaddingValues(vertical = 15.dp),
+            ) {
+                Text("Scan recent screenshots")
             }
         }
     }

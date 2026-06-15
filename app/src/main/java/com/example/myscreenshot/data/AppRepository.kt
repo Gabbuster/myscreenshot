@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import com.example.myscreenshot.extraction.DetectedAction
 import com.example.myscreenshot.reminders.ReminderScheduler
+import com.example.myscreenshot.widget.ReminderWidgetUpdater
 import kotlinx.coroutines.flow.Flow
 import java.io.File
 import java.util.UUID
@@ -19,15 +20,19 @@ class AppRepository(context: Context) {
 
     suspend fun deleteReminder(id: String) {
         database.reminderDao().updateStatus(id, "deleted", System.currentTimeMillis())
+        ReminderWidgetUpdater.refresh(appContext)
     }
 
     suspend fun deletePastEvents(): Int {
         val now = System.currentTimeMillis()
-        return database.reminderDao().deletePastEvents(now = now, updatedAt = now)
+        val deletedCount = database.reminderDao().deletePastEvents(now = now, updatedAt = now)
+        ReminderWidgetUpdater.refresh(appContext)
+        return deletedCount
     }
 
     suspend fun updateReminder(reminder: Reminder) {
         database.reminderDao().upsert(reminder.copy(updatedAt = System.currentTimeMillis()))
+        ReminderWidgetUpdater.refresh(appContext)
     }
 
     suspend fun markCalendarSaved(reminder: Reminder): Reminder {
@@ -36,6 +41,7 @@ class AppRepository(context: Context) {
             updatedAt = System.currentTimeMillis(),
         )
         database.reminderDao().upsert(updated)
+        ReminderWidgetUpdater.refresh(appContext)
         return updated
     }
 
@@ -45,6 +51,7 @@ class AppRepository(context: Context) {
             updatedAt = System.currentTimeMillis(),
         )
         database.reminderDao().upsert(updated)
+        ReminderWidgetUpdater.refresh(appContext)
         return updated
     }
 
@@ -56,6 +63,7 @@ class AppRepository(context: Context) {
             updatedAt = System.currentTimeMillis(),
         )
         database.reminderDao().upsert(updated)
+        ReminderWidgetUpdater.refresh(appContext)
         return updated
     }
 
@@ -98,6 +106,7 @@ class AppRepository(context: Context) {
                 createdAt = now,
             ),
         )
+        ReminderWidgetUpdater.refresh(appContext)
         return reminder
     }
 

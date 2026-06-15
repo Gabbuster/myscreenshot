@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -61,7 +60,6 @@ import com.example.myscreenshot.ui.detail.getSmartReminderSuggestions
 import com.example.myscreenshot.ui.detail.isAvailable
 import com.example.myscreenshot.ui.detail.isVisibleAction
 import com.example.myscreenshot.ui.theme.AppInk
-import com.example.myscreenshot.ui.theme.AppPaper
 import com.example.myscreenshot.ui.theme.AppSuccess
 import com.example.myscreenshot.ui.theme.MyScreenshotTheme
 import java.text.DateFormat
@@ -107,7 +105,6 @@ fun ReminderDetailContent(
 ) {
     val context = LocalContext.current
     val category = reminder.category()
-    var showScreenshot by remember { mutableStateOf(false) }
     var showScreenshotViewer by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -167,30 +164,10 @@ fun ReminderDetailContent(
             )
         }
         item {
-            CollapsedSection(
-                title = "Original screenshot",
-                expanded = showScreenshot,
-                onToggle = { showScreenshot = !showScreenshot },
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SourceThumbnail(
-                        sourceType = reminder.sourceType,
-                        sourceUri = reminder.sourceImageUri,
-                        contentScale = ContentScale.Fit,
-                        thumbnailSize = 720,
-                        showSheen = false,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(154.dp)
-                            .clickable { showScreenshotViewer = true },
-                    )
-                    Text(
-                        "Tap to view full screenshot",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.labelMedium,
-                    )
-                }
-            }
+            OriginalScreenshotTile(
+                reminder = reminder,
+                onOpen = { showScreenshotViewer = true },
+            )
         }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -564,28 +541,37 @@ private fun SavedStatusChip(text: String) {
 }
 
 @Composable
-private fun CollapsedSection(
-    title: String,
-    expanded: Boolean,
-    onToggle: () -> Unit,
-    content: @Composable () -> Unit,
+private fun OriginalScreenshotTile(
+    reminder: Reminder,
+    onOpen: () -> Unit,
 ) {
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(AppPaper, RoundedCornerShape(22.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.72f), RoundedCornerShape(22.dp))
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.62f), RoundedCornerShape(8.dp))
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        TextButton(onClick = onToggle, modifier = Modifier.fillMaxWidth()) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(title, fontWeight = FontWeight.SemiBold)
-                Text(if (expanded) "Hide" else "Show")
-            }
-        }
-        if (expanded) {
-            content()
+        SourceThumbnail(
+            sourceType = reminder.sourceType,
+            sourceUri = reminder.sourceImageUri,
+            contentScale = ContentScale.Crop,
+            thumbnailSize = 360,
+            showSheen = false,
+            modifier = Modifier
+                .size(86.dp)
+                .clickable { onOpen() },
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.weight(1f)) {
+            Text("Original screenshot", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(
+                "Tap the square to open it.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+            )
         }
     }
 }

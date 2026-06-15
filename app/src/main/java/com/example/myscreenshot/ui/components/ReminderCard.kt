@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -121,7 +122,7 @@ private fun ReminderThumbnailWithBookmark(
         BookmarkButton(
             tagColor = reminder.tagColor,
             onClick = { onTagClick(reminder) },
-            modifier = Modifier.align(Alignment.TopStart),
+            modifier = Modifier.align(Alignment.TopEnd),
         )
     }
 }
@@ -139,6 +140,15 @@ private fun BookmarkButton(
             .clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.TopCenter,
     ) {
+        Box(
+            modifier = Modifier
+                .offset(x = 2.dp, y = 2.dp)
+                .size(width = 20.dp, height = 42.dp)
+                .background(
+                    color = Color.Black.copy(alpha = 0.20f),
+                    shape = RoundedCornerShape(bottomStart = 7.dp, bottomEnd = 7.dp),
+                ),
+        )
         Box(
             modifier = Modifier
                 .size(width = 20.dp, height = 42.dp)

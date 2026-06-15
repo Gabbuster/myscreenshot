@@ -25,4 +25,7 @@ interface ReminderDao {
 
     @Query("UPDATE reminders SET status = 'deleted', updatedAt = :updatedAt WHERE status != 'deleted' AND dateTime IS NOT NULL AND dateTime < :now")
     suspend fun deletePastEvents(now: Long, updatedAt: Long): Int
+
+    @Query("SELECT * FROM reminders WHERE status != 'deleted' AND dateTime IS NOT NULL AND dateTime >= :now ORDER BY dateTime ASC LIMIT :limit")
+    suspend fun nextReminders(now: Long, limit: Int): List<Reminder>
 }

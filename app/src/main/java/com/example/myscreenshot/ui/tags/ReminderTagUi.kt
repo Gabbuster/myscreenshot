@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -67,15 +68,16 @@ fun String.toTagColor(): Color =
 
 @Composable
 fun TagsSectionHeader(tagSummaries: List<TagSummary>) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text("Tags", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Tags", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
         Text(
             if (tagSummaries.isEmpty()) {
-                "Create tags from a reminder thumbnail."
+                "Bookmark a capture to group trips, events, weddings, or projects."
             } else {
-                "${tagSummaries.size} tag collections"
+                "${tagSummaries.size} collections ready"
             },
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyMedium,
         )
     }
 }
@@ -85,9 +87,10 @@ fun EmptyTagsCard() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(18.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f), RoundedCornerShape(18.dp))
-            .heightIn(min = 120.dp),
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
+            .heightIn(min = 118.dp)
+            .padding(18.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -116,22 +119,35 @@ fun TagCategoryRow(
             val selected = selectedTag == tag.name
             Button(
                 onClick = { onSelected(tag) },
-                modifier = Modifier.width(132.dp),
-                shape = RoundedCornerShape(18.dp),
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp),
+                modifier = Modifier.width(156.dp),
+                shape = RoundedCornerShape(8.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (selected) tag.color.toTagColor() else MaterialTheme.colorScheme.surface,
                     contentColor = if (selected) Color.White else MaterialTheme.colorScheme.onSurface,
                 ),
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(
-                        modifier = Modifier
-                            .size(12.dp)
-                            .background(tag.color.toTagColor(), RoundedCornerShape(50)),
-                    )
-                    Text(tag.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge)
-                    Text("${tag.count}", style = MaterialTheme.typography.labelMedium)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Box {
+                        Box(
+                            modifier = Modifier
+                                .size(width = 18.dp, height = 38.dp)
+                                .background(Color.Black.copy(alpha = 0.16f), RoundedCornerShape(bottomStart = 6.dp, bottomEnd = 6.dp)),
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(width = 16.dp, height = 36.dp)
+                                .background(tag.color.toTagColor(), RoundedCornerShape(bottomStart = 6.dp, bottomEnd = 6.dp)),
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(tag.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                        Text("${tag.count} captures", style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                    }
                 }
             }
         }
