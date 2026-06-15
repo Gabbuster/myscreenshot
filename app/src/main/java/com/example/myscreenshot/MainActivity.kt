@@ -11,6 +11,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -21,7 +25,9 @@ import com.example.myscreenshot.data.AppRepository
 import com.example.myscreenshot.navigation.AppNavHost
 import com.example.myscreenshot.ocr.SharedInput
 import com.example.myscreenshot.reminders.NotificationHelper
+import com.example.myscreenshot.ui.Screen4UIntro
 import com.example.myscreenshot.ui.theme.MyScreenshotTheme
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
     private var sharedInputState = mutableStateOf<SharedInput?>(null)
@@ -37,9 +43,15 @@ class MainActivity : ComponentActivity() {
             val repository = remember { AppRepository(applicationContext) }
             var sharedInput by remember { sharedInputState }
             var darkMode by remember { mutableStateOf(preferences.getBoolean("dark_mode", false)) }
+            var showIntro by remember { mutableStateOf(true) }
             val permissionLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.RequestPermission(),
             ) {}
+
+            LaunchedEffect(Unit) {
+                delay(1150)
+                showIntro = false
+            }
 
             LaunchedEffect(Unit) {
                 if (Build.VERSION.SDK_INT >= 33 &&
@@ -53,15 +65,23 @@ class MainActivity : ComponentActivity() {
             }
 
             MyScreenshotTheme(darkTheme = darkMode) {
-                AppNavHost(
-                    repository = repository,
-                    initialSharedInput = sharedInput,
-                    darkMode = darkMode,
-                    onDarkModeChange = {
-                        darkMode = it
-                        preferences.edit().putBoolean("dark_mode", it).apply()
-                    },
-                )
+                Box {
+                    AppNavHost(
+                        repository = repository,
+                        initialSharedInput = sharedInput,
+                        darkMode = darkMode,
+                        onDarkModeChange = {
+                            darkMode = it
+                            preferences.edit().putBoolean("dark_mode", it).apply()
+                        },
+                    )
+                    AnimatedVisibility(
+                        visible = showIntro,
+                        exit = fadeOut(animationSpec = tween(durationMillis = 260)),
+                    ) {
+                        Screen4UIntro()
+                    }
+                }
             }
         }
     }
