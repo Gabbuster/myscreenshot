@@ -9,8 +9,8 @@ import androidx.compose.ui.graphics.Color
 
 private val DarkColorScheme = darkColorScheme(
     primary = AppOrange,
-    onPrimary = Color(0xFF11161F),
-    primaryContainer = Color(0xFF4A2400),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFF4A2100),
     onPrimaryContainer = Color(0xFFFFE1BF),
     secondary = Color(0xFFFFB347),
     onSecondary = AppInk,
@@ -33,7 +33,7 @@ private val DarkColorScheme = darkColorScheme(
 
 private val LightColorScheme = lightColorScheme(
     primary = AppOrange,
-    onPrimary = AppInk,
+    onPrimary = Color(0xFFFFFFFF),
     primaryContainer = AppPeach,
     onPrimaryContainer = Color(0xFF3C1C00),
     secondary = AppScan,
@@ -75,10 +75,10 @@ fun MyScreenshotTheme(
 }
 
 private object ColorTokens {
-    val DarkBackground = androidx.compose.ui.graphics.Color(0xFF0C1116)
-    val DarkSurface = androidx.compose.ui.graphics.Color(0xFF151B22)
-    val DarkSurfaceVariant = androidx.compose.ui.graphics.Color(0xFF20272F)
-    val DarkText = androidx.compose.ui.graphics.Color(0xFFF8F3E7)
-    val DarkMutedText = androidx.compose.ui.graphics.Color(0xFFB8B0A1)
-    val DarkBorder = androidx.compose.ui.graphics.Color(0xFF39352D)
+    val DarkBackground = androidx.compose.ui.graphics.Color(0xFF101113)
+    val DarkSurface = androidx.compose.ui.graphics.Color(0xFF191B1F)
+    val DarkSurfaceVariant = androidx.compose.ui.graphics.Color(0xFF24272D)
+    val DarkText = androidx.compose.ui.graphics.Color(0xFFFFF8F0)
+    val DarkMutedText = androidx.compose.ui.graphics.Color(0xFFC9C1B8)
+    val DarkBorder = androidx.compose.ui.graphics.Color(0xFF3A342E)
 }

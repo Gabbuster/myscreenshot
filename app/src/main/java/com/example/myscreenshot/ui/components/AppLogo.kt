@@ -9,10 +9,10 @@ import androidx.compose.ui.unit.dp
 import com.example.myscreenshot.R
 
 @Composable
-fun AppLogo(modifier: Modifier = Modifier) {
+fun AppLogo(modifier: Modifier = Modifier.size(72.dp)) {
     Image(
         painter = painterResource(R.drawable.screenshot_reminder_logo),
-        contentDescription = "Screenshot Reminder logo",
-        modifier = modifier.size(72.dp),
+        contentDescription = "Snappy, the Screen4U fox mascot",
+        modifier = modifier,
     )
 }

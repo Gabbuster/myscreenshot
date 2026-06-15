@@ -25,6 +25,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.myscreenshot.data.Reminder
+import com.example.myscreenshot.ui.tags.toTagColor
 import java.text.DateFormat
 import java.util.Date
 
@@ -39,9 +40,9 @@ fun ReminderCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .shadow(3.dp, RoundedCornerShape(8.dp), ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
+            .shadow(7.dp, RoundedCornerShape(8.dp), ambientColor = Color.Black.copy(alpha = 0.05f))
             .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.78f), RoundedCornerShape(8.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.68f), RoundedCornerShape(8.dp))
             .heightIn(min = 112.dp)
             .clickable(role = Role.Button, onClick = onClick)
             .padding(16.dp),
@@ -85,20 +86,21 @@ fun ReminderCard(
             } else {
                 Box(
                     modifier = Modifier
-                        .size(56.dp)
+                        .size(64.dp)
                         .clickable { onTagClick(reminder) },
                 ) {
                     SourceThumbnail(
                         sourceType = reminder.sourceType,
                         sourceUri = reminder.sourceImageUri,
-                        modifier = Modifier.size(56.dp),
+                        modifier = Modifier.size(64.dp),
                     )
                     reminder.tagColor?.toTagColor()?.let { color ->
                         Box(
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
-                                .size(width = 13.dp, height = 30.dp)
-                                .background(color, RoundedCornerShape(bottomStart = 7.dp, bottomEnd = 7.dp)),
+                                .size(width = 12.dp, height = 34.dp)
+                                .background(color, RoundedCornerShape(bottomStart = 6.dp, bottomEnd = 6.dp))
+                                .border(1.dp, Color.White.copy(alpha = 0.82f), RoundedCornerShape(bottomStart = 6.dp, bottomEnd = 6.dp)),
                         )
                     }
                 }
@@ -106,6 +108,3 @@ fun ReminderCard(
         }
     }
 }
-
-private fun String.toTagColor(): Color =
-    runCatching { Color(android.graphics.Color.parseColor(this)) }.getOrElse { Color(0xFFFF8A1F) }

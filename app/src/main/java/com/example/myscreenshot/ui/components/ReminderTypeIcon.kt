@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -19,11 +20,12 @@ import com.example.myscreenshot.R
 fun ReminderTypeIcon(type: String, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
-            .size(50.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .size(52.dp)
+            .clip(RoundedCornerShape(8.dp))
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f), RoundedCornerShape(16.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.62f), RoundedCornerShape(8.dp))
             .padding(6.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Image(
             painter = painterResource(type.iconRes()),

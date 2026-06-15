@@ -6,6 +6,7 @@ import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -30,6 +32,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.example.myscreenshot.ui.components.AppLogo
+import com.example.myscreenshot.ui.theme.AppInk
+import com.example.myscreenshot.ui.theme.AppOrange
 import com.example.myscreenshot.ui.theme.MyScreenshotTheme
 
 @Composable
@@ -50,9 +55,23 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 TextButton(onClick = onBack) { Text("Back") }
-                Text("Settings", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Settings", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .background(AppInk, RoundedCornerShape(8.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        AppLogo(Modifier.size(38.dp))
+                    }
+                }
             }
         }
         item {
@@ -67,10 +86,10 @@ fun SettingsScreen(
         item {
             SettingsCard {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                    Text("Screen4U assist")
+                    Text("Snappy assist")
                     Switch(checked = true, onCheckedChange = {}, enabled = false)
                 }
-                Text("Screen4U reads screenshots with device OCR and local entity detection. Users do not need API keys or accounts.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Snappy reads screenshots with device OCR and local entity detection. Users do not need API keys or accounts.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         item {
@@ -95,10 +114,10 @@ fun SettingsScreen(
         }
         item {
             SettingsCard {
-                Text("Screen4U assist", fontWeight = FontWeight.SemiBold)
+                Text("Snappy assist", fontWeight = FontWeight.SemiBold)
                 Text(
                     "Enabled on this device",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = AppOrange,
                 )
                 Text(
                     "Screen4U combines OCR, downloaded ML Kit language models, and strict local rules for flights, hotels, bills, deliveries, appointments, and documents.",
@@ -128,9 +147,9 @@ private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(3.dp, RoundedCornerShape(8.dp), ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
+            .shadow(8.dp, RoundedCornerShape(8.dp), ambientColor = AppInk.copy(alpha = 0.05f))
             .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f), RoundedCornerShape(8.dp))
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
         content = content,

@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.myscreenshot.extraction.DetectedAction
@@ -38,9 +39,9 @@ fun ActionCard(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .shadow(3.dp, RoundedCornerShape(8.dp), ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
+            .shadow(7.dp, RoundedCornerShape(8.dp), ambientColor = Color.Black.copy(alpha = 0.05f))
             .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.78f), RoundedCornerShape(8.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.68f), RoundedCornerShape(8.dp))
             .padding(16.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.Top,

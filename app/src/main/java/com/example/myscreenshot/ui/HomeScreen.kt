@@ -48,6 +48,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.myscreenshot.data.AppRepository
 import com.example.myscreenshot.data.Reminder
+import com.example.myscreenshot.ui.components.AppLogo
 import com.example.myscreenshot.ui.components.FilterChipRow
 import com.example.myscreenshot.ui.components.ReminderCard
 import com.example.myscreenshot.ui.tags.EmptyTagsCard
@@ -56,6 +57,7 @@ import com.example.myscreenshot.ui.tags.TagEditorDialog
 import com.example.myscreenshot.ui.tags.TagsSectionHeader
 import com.example.myscreenshot.ui.tags.tagSummaries
 import com.example.myscreenshot.ui.theme.AppInk
+import com.example.myscreenshot.ui.theme.AppOrange
 import com.example.myscreenshot.ui.theme.AppProof
 import com.example.myscreenshot.ui.theme.AppScan
 import com.example.myscreenshot.ui.theme.MyScreenshotTheme
@@ -259,16 +261,17 @@ private fun AttentionHero(
         else -> "Nothing urgent today"
     }
     val supportText = if (reminders.isEmpty()) {
-        "Add a screenshot and Screen4U will pull out what matters."
+        "Snappy reads the screenshot and turns the useful bit into a reminder."
     } else {
-        "Screen4U found ${reminders.size} reminders in your captures."
+        "Snappy found ${reminders.size} reminders in your captures."
     }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(9.dp, RoundedCornerShape(24.dp), ambientColor = AppInk.copy(alpha = 0.14f))
-            .background(AppInk, RoundedCornerShape(24.dp))
+            .shadow(10.dp, RoundedCornerShape(8.dp), ambientColor = AppInk.copy(alpha = 0.08f))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.72f), RoundedCornerShape(8.dp))
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -278,42 +281,60 @@ private fun AttentionHero(
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalAlignment = Alignment.Top,
                 ) {
-                    Text("Screen4U", color = AppScan, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(58.dp)
+                                .background(AppInk, RoundedCornerShape(8.dp))
+                                .border(1.dp, AppOrange.copy(alpha = 0.55f), RoundedCornerShape(8.dp)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            AppLogo(Modifier.size(50.dp))
+                        }
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text("Screen4U", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+                            Text("Snappy is on it", color = AppOrange, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                        }
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         IconButton(
                             onClick = onToggleSearch,
                             modifier = Modifier
-                                .size(42.dp)
-                                .background(Color.White.copy(alpha = 0.10f), RoundedCornerShape(14.dp)),
+                                .size(48.dp)
+                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)),
                         ) {
-                            SearchGlyph(color = Color.White)
+                            SearchGlyph(color = MaterialTheme.colorScheme.onSurface)
                         }
                         IconButton(
                             onClick = onOpenSettings,
                             modifier = Modifier
-                                .size(42.dp)
-                                .background(Color.White.copy(alpha = 0.10f), RoundedCornerShape(14.dp)),
+                                .size(48.dp)
+                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)),
                         ) {
-                            SettingsGlyph(color = Color.White)
+                            SettingsGlyph(color = MaterialTheme.colorScheme.onSurface)
                         }
                     }
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(status.uppercase(), color = Color.White.copy(alpha = 0.64f), style = MaterialTheme.typography.labelMedium)
+                    Text(status.uppercase(), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
                     Text(
                         headline,
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.ExtraBold,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         supportText,
-                        color = Color.White.copy(alpha = 0.72f),
-                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -324,10 +345,10 @@ private fun AttentionHero(
             onClick = onAddScreenshot,
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(
-                containerColor = Color.White,
-                contentColor = AppInk,
+                containerColor = AppInk,
+                contentColor = Color.White,
             ),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(8.dp),
             contentPadding = PaddingValues(vertical = 13.dp),
         ) {
             Text("+ Add Screenshot", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -347,13 +368,13 @@ private fun AttentionHero(
 private fun HeroChip(label: String, value: String, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
-            .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(15.dp))
+            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f), RoundedCornerShape(8.dp))
             .padding(horizontal = 10.dp, vertical = 7.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(value, color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        Text(label, color = Color.White.copy(alpha = 0.62f), style = MaterialTheme.typography.labelMedium, maxLines = 1)
+        Text(value, color = MaterialTheme.colorScheme.onPrimaryContainer, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium, maxLines = 1)
     }
 }
 

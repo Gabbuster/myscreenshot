@@ -8,21 +8,21 @@ import androidx.compose.ui.unit.sp
 
 val Typography = Typography(
     headlineLarge = TextStyle(
-        fontFamily = FontFamily.Serif,
-        fontWeight = FontWeight.Bold,
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.ExtraBold,
         fontSize = 34.sp,
-        lineHeight = 39.sp,
+        lineHeight = 38.sp,
         letterSpacing = 0.sp,
     ),
     headlineMedium = TextStyle(
-        fontFamily = FontFamily.Serif,
-        fontWeight = FontWeight.Bold,
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.ExtraBold,
         fontSize = 26.sp,
         lineHeight = 32.sp,
         letterSpacing = 0.sp,
     ),
     headlineSmall = TextStyle(
-        fontFamily = FontFamily.Serif,
+        fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Bold,
         fontSize = 22.sp,
         lineHeight = 28.sp,

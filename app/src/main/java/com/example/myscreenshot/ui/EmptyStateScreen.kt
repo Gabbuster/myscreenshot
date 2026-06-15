@@ -21,8 +21,9 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.myscreenshot.ui.components.AppLogo
 import com.example.myscreenshot.ui.theme.AppInk
-import com.example.myscreenshot.ui.theme.AppScan
+import com.example.myscreenshot.ui.theme.AppOrange
 import com.example.myscreenshot.ui.theme.MyScreenshotTheme
 
 @Composable
@@ -35,12 +36,25 @@ fun EmptyStateScreen(onTrySample: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
+        Box(
+            modifier = Modifier
+                .size(92.dp)
+                .background(AppInk, RoundedCornerShape(8.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            AppLogo(Modifier.size(82.dp))
+        }
         Text("No reminders yet", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Text(
-            "Share a screenshot, bill, booking, appointment, or PDF to create your first reminder.",
+            "Share a screenshot, bill, booking, appointment, or PDF. Snappy will find the useful part.",
             modifier = Modifier.padding(vertical = 14.dp),
         )
-        Button(onClick = onTrySample) { Text("Try sample screenshot") }
+        Button(
+            onClick = onTrySample,
+            shape = RoundedCornerShape(8.dp),
+        ) {
+            Text("Try sample screenshot")
+        }
         Text("Everything is processed locally on your phone.", modifier = Modifier.padding(top = 14.dp))
     }
 }
@@ -50,37 +64,37 @@ fun EmptyStateCard(onTrySample: () -> Unit, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .shadow(3.dp, RoundedCornerShape(8.dp), ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
+            .shadow(8.dp, RoundedCornerShape(8.dp), ambientColor = AppInk.copy(alpha = 0.06f))
             .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.72f), RoundedCornerShape(8.dp))
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Box(
             modifier = Modifier
-                .size(58.dp)
+                .size(82.dp)
                 .background(AppInk, RoundedCornerShape(8.dp)),
             contentAlignment = Alignment.Center,
         ) {
-            Text("+", color = AppScan, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            AppLogo(Modifier.size(74.dp))
         }
-        Text("No reminders yet", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text("Snappy is ready", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
         Text(
-            "Share a screenshot, bill, booking, appointment, or PDF to create your first reminder.",
+            "Add a screenshot and Screen4U will turn dates, bookings, bills, and tasks into reminders.",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Button(
             onClick = onTrySample,
             colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
+                containerColor = AppInk,
+                contentColor = MaterialTheme.colorScheme.surface,
             ),
             shape = RoundedCornerShape(8.dp),
         ) {
             Text("Try sample screenshot")
         }
-        Text("Everything stays local on your phone.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Everything stays local on your phone.", style = MaterialTheme.typography.bodySmall, color = AppOrange)
     }
 }
 
