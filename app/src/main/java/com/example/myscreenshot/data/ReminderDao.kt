@@ -22,5 +22,7 @@ interface ReminderDao {
 
     @Query("UPDATE reminders SET status = :status, updatedAt = :updatedAt WHERE id = :id")
     suspend fun updateStatus(id: String, status: String, updatedAt: Long)
-}
 
+    @Query("UPDATE reminders SET status = 'deleted', updatedAt = :updatedAt WHERE status != 'deleted' AND dateTime IS NOT NULL AND dateTime < :now")
+    suspend fun deletePastEvents(now: Long, updatedAt: Long): Int
+}

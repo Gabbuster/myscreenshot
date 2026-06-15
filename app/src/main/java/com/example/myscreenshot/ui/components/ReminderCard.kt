@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.myscreenshot.data.Reminder
 import com.example.myscreenshot.ui.tags.toTagColor
@@ -43,44 +44,41 @@ fun ReminderCard(
             .shadow(7.dp, RoundedCornerShape(8.dp), ambientColor = Color.Black.copy(alpha = 0.05f))
             .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
             .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.68f), RoundedCornerShape(8.dp))
-            .heightIn(min = 112.dp)
+            .heightIn(min = 96.dp)
             .clickable(role = Role.Button, onClick = onClick)
-            .padding(16.dp),
+            .padding(12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             ReminderThumbnailWithBookmark(
                 reminder = reminder,
                 onTagClick = onTagClick,
             )
-            Spacer(Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     reminder.title,
                     color = if (isPast) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold,
                     style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                Text(reminder.type.uppercase(), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                reminder.dateTime?.let { start ->
-                    val df = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
-                    val startStr = df.format(Date(start))
-                    val dateText = if (reminder.endDateTime != null) {
-                        "$startStr - ${df.format(Date(reminder.endDateTime))}"
-                    } else {
-                        startStr
-                    }
+                reminder.usefulPreview()?.let { preview ->
                     Text(
-                        dateText,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        preview,
                         style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
-                if (reminder.notes.isNotBlank()) {
+                reminder.dateTime?.let { start ->
                     Text(
-                        reminder.notes.lineSequence().first(),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        reminder.dateLabel(start),
+                        color = if (isPast) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.labelMedium,
                         maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
@@ -89,6 +87,22 @@ fun ReminderCard(
             }
         }
     }
+}
+
+private fun Reminder.usefulPreview(): String? =
+    notes
+        .lineSequence()
+        .map { it.trim() }
+        .firstOrNull { it.isNotBlank() }
+        ?: ocrText
+            .lineSequence()
+            .map { it.trim() }
+            .firstOrNull { it.length > 8 }
+
+private fun Reminder.dateLabel(start: Long): String {
+    val df = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
+    val startText = df.format(Date(start))
+    return endDateTime?.let { "$startText - ${df.format(Date(it))}" } ?: startText
 }
 
 @Composable

@@ -21,6 +21,11 @@ class AppRepository(context: Context) {
         database.reminderDao().updateStatus(id, "deleted", System.currentTimeMillis())
     }
 
+    suspend fun deletePastEvents(): Int {
+        val now = System.currentTimeMillis()
+        return database.reminderDao().deletePastEvents(now = now, updatedAt = now)
+    }
+
     suspend fun updateReminder(reminder: Reminder) {
         database.reminderDao().upsert(reminder.copy(updatedAt = System.currentTimeMillis()))
     }
