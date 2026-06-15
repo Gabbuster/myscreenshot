@@ -25,6 +25,35 @@ class AppRepository(context: Context) {
         database.reminderDao().upsert(reminder.copy(updatedAt = System.currentTimeMillis()))
     }
 
+    suspend fun markCalendarSaved(reminder: Reminder): Reminder {
+        val updated = reminder.copy(
+            calendarSavedAt = System.currentTimeMillis(),
+            updatedAt = System.currentTimeMillis(),
+        )
+        database.reminderDao().upsert(updated)
+        return updated
+    }
+
+    suspend fun markAlarmSaved(reminder: Reminder): Reminder {
+        val updated = reminder.copy(
+            alarmSavedAt = System.currentTimeMillis(),
+            updatedAt = System.currentTimeMillis(),
+        )
+        database.reminderDao().upsert(updated)
+        return updated
+    }
+
+    suspend fun assignTag(reminder: Reminder, tagName: String?, tagColor: String?): Reminder {
+        val cleanName = tagName?.trim()?.takeIf { it.isNotBlank() }
+        val updated = reminder.copy(
+            tagName = cleanName,
+            tagColor = cleanName?.let { tagColor },
+            updatedAt = System.currentTimeMillis(),
+        )
+        database.reminderDao().upsert(updated)
+        return updated
+    }
+
     suspend fun saveAction(
         action: DetectedAction,
         title: String,

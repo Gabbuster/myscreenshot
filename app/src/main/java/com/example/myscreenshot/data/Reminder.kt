@@ -18,8 +18,11 @@ data class Reminder(
     val location: String?,
     val notes: String,
     val confidence: String,
+    val calendarSavedAt: Long? = null,
+    val alarmSavedAt: Long? = null,
+    val tagName: String? = null,
+    val tagColor: String? = null,
     val status: String,
     val createdAt: Long,
     val updatedAt: Long,
 )
-

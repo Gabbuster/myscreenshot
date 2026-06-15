@@ -8,14 +8,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFFFFC24A),
+    primary = AppOrange,
     onPrimary = Color(0xFF11161F),
-    primaryContainer = Color(0xFF123A35),
-    onPrimaryContainer = Color(0xFFDDEFEA),
-    secondary = Color(0xFF6FD0BF),
+    primaryContainer = Color(0xFF4A2400),
+    onPrimaryContainer = Color(0xFFFFE1BF),
+    secondary = Color(0xFFFFB347),
     onSecondary = AppInk,
-    secondaryContainer = Color(0xFF1B3F39),
-    onSecondaryContainer = Color(0xFFDDEFEA),
+    secondaryContainer = Color(0xFF3A2A16),
+    onSecondaryContainer = Color(0xFFFFE1BF),
     tertiary = Color(0xFFE38A70),
     tertiaryContainer = Color(0xFF4D2119),
     onTertiaryContainer = Color(0xFFFFD8CC),
@@ -32,10 +32,10 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = AppProof,
-    onPrimary = Color.White,
-    primaryContainer = AppProofSoft,
-    onPrimaryContainer = Color(0xFF06362F),
+    primary = AppOrange,
+    onPrimary = AppInk,
+    primaryContainer = AppPeach,
+    onPrimaryContainer = Color(0xFF3C1C00),
     secondary = AppScan,
     onSecondary = AppInk,
     secondaryContainer = AppPeach,

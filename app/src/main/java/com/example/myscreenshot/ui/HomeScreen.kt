@@ -33,6 +33,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,11 +50,17 @@ import com.example.myscreenshot.data.AppRepository
 import com.example.myscreenshot.data.Reminder
 import com.example.myscreenshot.ui.components.FilterChipRow
 import com.example.myscreenshot.ui.components.ReminderCard
+import com.example.myscreenshot.ui.tags.EmptyTagsCard
+import com.example.myscreenshot.ui.tags.TagCategoryRow
+import com.example.myscreenshot.ui.tags.TagEditorDialog
+import com.example.myscreenshot.ui.tags.TagsSectionHeader
+import com.example.myscreenshot.ui.tags.tagSummaries
 import com.example.myscreenshot.ui.theme.AppInk
 import com.example.myscreenshot.ui.theme.AppProof
 import com.example.myscreenshot.ui.theme.AppScan
 import com.example.myscreenshot.ui.theme.MyScreenshotTheme
 import java.time.LocalTime
+import kotlinx.coroutines.launch
 
 @Composable
 fun HomeScreen(
@@ -64,12 +71,18 @@ fun HomeScreen(
     onAddManual: () -> Unit,
 ) {
     val reminders by repository.observeReminders().collectAsState(initial = emptyList())
+    val scope = rememberCoroutineScope()
     HomeContent(
         reminders = reminders,
         onOpenReminder = onOpenReminder,
         onOpenSettings = onOpenSettings,
         onTrySample = onTrySample,
         onAddManual = onAddManual,
+        onAssignTag = { reminder, tagName, tagColor ->
+            scope.launch {
+                repository.assignTag(reminder, tagName, tagColor)
+            }
+        },
     )
 }
 
@@ -80,10 +93,15 @@ fun HomeContent(
     onOpenSettings: () -> Unit,
     onTrySample: () -> Unit,
     onAddManual: () -> Unit,
+    onAssignTag: (Reminder, String?, String?) -> Unit = { _, _, _ -> },
 ) {
     var selectedFilter by remember { mutableStateOf("All") }
     var searchVisible by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var selectedSection by remember { mutableStateOf("Home") }
+    var selectedTag by remember { mutableStateOf<String?>(null) }
+    var tagEditorReminder by remember { mutableStateOf<Reminder?>(null) }
+    val tagSummaries = reminders.tagSummaries()
     Scaffold(
         bottomBar = {
             NavigationBar(
@@ -92,20 +110,19 @@ fun HomeContent(
             ) {
                 val navItems = listOf(
                     "Home",
-                    "Review",
-                    "Archive",
+                    "Tags",
                     "Settings",
                 )
                 navItems.forEach { item ->
                     NavigationBarItem(
-                        selected = item == "Home",
+                        selected = selectedSection == item,
                         onClick = {
                             when (item) {
                                 "Settings" -> onOpenSettings()
-                                "Review" -> onAddManual()
+                                else -> selectedSection = item
                             }
                         },
-                        icon = { NavDot(selected = item == "Home") },
+                        icon = { NavDot(selected = selectedSection == item) },
                         label = { Text(item) },
                     )
                 }
@@ -134,34 +151,87 @@ fun HomeContent(
                     SearchField(searchQuery = searchQuery, onSearchQueryChange = { searchQuery = it })
                 }
             }
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text("Focus by type", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("${reminders.count { it.dateTime == null || it.dateTime >= System.currentTimeMillis() }} active", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
-                }
-            }
-            item {
-                FilterChipRow(selected = selectedFilter, onSelected = { selectedFilter = it })
-            }
-            val visibleReminders = reminders.filterFor(selectedFilter).search(searchQuery)
-            if (visibleReminders.isEmpty()) {
+            if (selectedSection == "Tags") {
                 item {
-                    Spacer(Modifier.height(18.dp))
-                    EmptyStateCard(onTrySample = onTrySample)
+                    TagsSectionHeader(tagSummaries = tagSummaries)
+                }
+                if (tagSummaries.isEmpty()) {
+                    item {
+                        EmptyTagsCard()
+                    }
+                } else {
+                    item {
+                        TagCategoryRow(
+                            tags = tagSummaries,
+                            selectedTag = selectedTag,
+                            onSelected = { selectedTag = it.name },
+                        )
+                    }
+                    val tagReminders = selectedTag
+                        ?.let { tag -> reminders.filter { it.tagName == tag } }
+                        ?: reminders.filter { it.tagName != null }
+                    item {
+                        Text(
+                            selectedTag ?: "All tagged reminders",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.SemiBold,
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                    }
+                    items(tagReminders) { reminder ->
+                        ReminderCard(
+                            reminder = reminder,
+                            onClick = { onOpenReminder(reminder.id) },
+                            onTagClick = { tagEditorReminder = it },
+                        )
+                    }
                 }
             } else {
                 item {
-                    Text("Recent captures", color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelLarge)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("Focus by type", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("${reminders.count { it.dateTime == null || it.dateTime >= System.currentTimeMillis() }} active", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
+                    }
                 }
-                items(visibleReminders) { reminder ->
-                    ReminderCard(reminder = reminder, onClick = { onOpenReminder(reminder.id) })
+                item {
+                    FilterChipRow(selected = selectedFilter, onSelected = { selectedFilter = it })
+                }
+                val visibleReminders = reminders.filterFor(selectedFilter).search(searchQuery)
+                if (visibleReminders.isEmpty()) {
+                    item {
+                        Spacer(Modifier.height(18.dp))
+                        EmptyStateCard(onTrySample = onTrySample)
+                    }
+                } else {
+                    item {
+                        Text("Recent captures", color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelLarge)
+                    }
+                    items(visibleReminders) { reminder ->
+                        ReminderCard(
+                            reminder = reminder,
+                            onClick = { onOpenReminder(reminder.id) },
+                            onTagClick = { tagEditorReminder = it },
+                        )
+                    }
                 }
             }
         }
+    }
+
+    tagEditorReminder?.let { reminder ->
+        TagEditorDialog(
+            reminder = reminder,
+            existingTags = tagSummaries,
+            onDismiss = { tagEditorReminder = null },
+            onSave = { name, color ->
+                onAssignTag(reminder, name, color)
+                tagEditorReminder = null
+            },
+        )
     }
 }
 
@@ -189,9 +259,9 @@ private fun AttentionHero(
         else -> "Nothing urgent today"
     }
     val supportText = if (reminders.isEmpty()) {
-        "Add a screenshot and AI will pull out what matters."
+        "Add a screenshot and Screen4U will pull out what matters."
     } else {
-        "AI extracted ${reminders.size} reminders from your captures."
+        "Screen4U found ${reminders.size} reminders in your captures."
     }
 
     Column(
@@ -204,13 +274,34 @@ private fun AttentionHero(
     ) {
         BoxWithConstraints {
             val compact = maxWidth < 340.dp
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top,
-            ) {
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(status.uppercase(), color = AppScan, style = MaterialTheme.typography.labelMedium)
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("Screen4U", color = AppScan, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        IconButton(
+                            onClick = onToggleSearch,
+                            modifier = Modifier
+                                .size(42.dp)
+                                .background(Color.White.copy(alpha = 0.10f), RoundedCornerShape(14.dp)),
+                        ) {
+                            SearchGlyph(color = Color.White)
+                        }
+                        IconButton(
+                            onClick = onOpenSettings,
+                            modifier = Modifier
+                                .size(42.dp)
+                                .background(Color.White.copy(alpha = 0.10f), RoundedCornerShape(14.dp)),
+                        ) {
+                            SettingsGlyph(color = Color.White)
+                        }
+                    }
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(status.uppercase(), color = Color.White.copy(alpha = 0.64f), style = MaterialTheme.typography.labelMedium)
                     Text(
                         headline,
                         color = Color.White,
@@ -221,29 +312,11 @@ private fun AttentionHero(
                     )
                     Text(
                         supportText,
-                        color = Color.White.copy(alpha = 0.68f),
+                        color = Color.White.copy(alpha = 0.72f),
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    IconButton(
-                        onClick = onToggleSearch,
-                        modifier = Modifier
-                            .size(38.dp)
-                            .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp)),
-                    ) {
-                        SearchGlyph(color = Color.White)
-                    }
-                    IconButton(
-                        onClick = onOpenSettings,
-                        modifier = Modifier
-                            .size(38.dp)
-                            .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp)),
-                    ) {
-                        SettingsGlyph(color = Color.White)
-                    }
                 }
             }
         }

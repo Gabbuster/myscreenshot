@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -50,9 +51,18 @@ import com.example.myscreenshot.data.AppRepository
 import com.example.myscreenshot.data.Reminder
 import com.example.myscreenshot.ui.components.ReminderTypeIcon
 import com.example.myscreenshot.ui.components.SourceThumbnail
+import com.example.myscreenshot.ui.detail.ActionKind
+import com.example.myscreenshot.ui.detail.DetailAction
+import com.example.myscreenshot.ui.detail.ReminderCategory
+import com.example.myscreenshot.ui.detail.category
+import com.example.myscreenshot.ui.detail.getCategoryLabel
+import com.example.myscreenshot.ui.detail.getPrimaryActions
+import com.example.myscreenshot.ui.detail.getSmartReminderSuggestions
+import com.example.myscreenshot.ui.detail.isAvailable
+import com.example.myscreenshot.ui.detail.isVisibleAction
 import com.example.myscreenshot.ui.theme.AppInk
 import com.example.myscreenshot.ui.theme.AppPaper
-import com.example.myscreenshot.ui.theme.AppScan
+import com.example.myscreenshot.ui.theme.AppSuccess
 import com.example.myscreenshot.ui.theme.MyScreenshotTheme
 import java.text.DateFormat
 import java.time.LocalDateTime
@@ -60,36 +70,6 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Date
 import kotlinx.coroutines.launch
-
-private enum class ReminderCategory {
-    Travel,
-    Hotel,
-    Appointment,
-    Bill,
-    Document,
-    Delivery,
-    Unknown,
-}
-
-private data class DetailAction(
-    val label: String,
-    val kind: ActionKind,
-)
-
-private enum class ActionKind {
-    Calendar,
-    Maps,
-    Call,
-    Pay,
-    Track,
-    View,
-    Share,
-    Reminder,
-    CheckIn,
-    Airport,
-    Edit,
-    Delete,
-}
 
 @Composable
 fun ReminderDetailScreen(
@@ -159,22 +139,7 @@ fun ReminderDetailContent(
             )
         }
         item {
-            InfoCard(title = "AI Summary") {
-                Text(
-                    getAISummaryText(category),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-            }
-        }
-        item {
-            InfoCard(title = "Smart reminders") {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    getSmartReminderSuggestions(category).forEach {
-                        TimelineRow(text = it)
-                    }
-                }
-            }
+            CompactSmartRemindersCard(category)
         }
         item {
             SmartActionsRow(
@@ -184,6 +149,7 @@ fun ReminderDetailContent(
                     when (action.kind) {
                         ActionKind.Calendar -> if (reminder.dateTime != null) {
                             context.startActivity(CalendarIntentBuilder.build(reminder))
+                            onUpdate(reminder.copy(calendarSavedAt = System.currentTimeMillis()))
                         }
                         ActionKind.Maps -> reminder.location?.takeIf { it.isNotBlank() }?.let {
                             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=${Uri.encode(it)}")))
@@ -215,7 +181,7 @@ fun ReminderDetailContent(
                         showSheen = false,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .aspectRatio(0.72f)
+                            .height(154.dp)
                             .clickable { showScreenshotViewer = true },
                     )
                     Text(
@@ -427,7 +393,7 @@ private fun TopReminderCard(
                         color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.labelLarge,
                     )
-                    Text("AI reminder", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                    Text("Screen4U reminder", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -504,26 +470,24 @@ private fun InfoCard(title: String, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun TimelineRow(text: String) {
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .size(10.dp)
-                .background(AppScan, RoundedCornerShape(50)),
-        )
-        Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@Composable
 private fun SmartActionsRow(
     actions: List<DetailAction>,
     reminder: Reminder,
     onAction: (DetailAction) -> Unit,
 ) {
+    val visibleActions = actions.filter { it.isVisibleAction(reminder) }
+    val savedLabels = listOfNotNull(
+        reminder.calendarSavedAt?.let { "Saved in calendar" },
+        reminder.alarmSavedAt?.let { "Saved into Alarms" },
+    )
+    if (visibleActions.isEmpty() && savedLabels.isEmpty()) return
+
     InfoCard(title = "Actions") {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            actions.chunked(2).forEach { rowActions ->
+            if (savedLabels.isNotEmpty()) {
+                savedLabels.forEach { SavedStatusChip(it) }
+            }
+            visibleActions.chunked(2).forEach { rowActions ->
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                     rowActions.forEach { action ->
                         Button(
@@ -552,6 +516,54 @@ private fun SmartActionsRow(
 }
 
 @Composable
+private fun CompactSmartRemindersCard(category: ReminderCategory) {
+    val reminders = getSmartReminderSuggestions(category).take(3)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(18.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.62f), RoundedCornerShape(18.dp))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text("Smart reminders", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        reminders.chunked(2).forEach { rowItems ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                rowItems.forEach { label ->
+                    Text(
+                        label,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier
+                            .weight(1f)
+                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f), RoundedCornerShape(50))
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                        maxLines = 2,
+                    )
+                }
+                if (rowItems.size == 1) {
+                    Box(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SavedStatusChip(text: String) {
+    Text(
+        text,
+        color = AppSuccess,
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(AppSuccess.copy(alpha = 0.10f), RoundedCornerShape(14.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    )
+}
+
+@Composable
 private fun CollapsedSection(
     title: String,
     expanded: Boolean,
@@ -576,84 +588,6 @@ private fun CollapsedSection(
             content()
         }
     }
-}
-
-private fun Reminder.category(): ReminderCategory = when (type.trim().lowercase()) {
-    "travel", "flight" -> ReminderCategory.Travel
-    "hotel" -> ReminderCategory.Hotel
-    "appointment" -> ReminderCategory.Appointment
-    "bill", "payment" -> ReminderCategory.Bill
-    "document", "documents" -> ReminderCategory.Document
-    "delivery", "package" -> ReminderCategory.Delivery
-    else -> ReminderCategory.Unknown
-}
-
-private fun getCategoryLabel(category: ReminderCategory): String = when (category) {
-    ReminderCategory.Travel -> "TRAVEL"
-    ReminderCategory.Hotel -> "HOTEL"
-    ReminderCategory.Appointment -> "APPOINTMENT"
-    ReminderCategory.Bill -> "BILL"
-    ReminderCategory.Document -> "DOCUMENT"
-    ReminderCategory.Delivery -> "DELIVERY"
-    ReminderCategory.Unknown -> "REMINDER"
-}
-
-private fun getPrimaryActions(category: ReminderCategory): List<DetailAction> = when (category) {
-    ReminderCategory.Travel -> listOf(
-        DetailAction("Add to Calendar", ActionKind.Calendar),
-        DetailAction("Check-in", ActionKind.CheckIn),
-        DetailAction("Open Airport", ActionKind.Airport),
-    )
-    ReminderCategory.Hotel -> listOf(
-        DetailAction("Add to Calendar", ActionKind.Calendar),
-        DetailAction("Open Maps", ActionKind.Maps),
-        DetailAction("Call Hotel", ActionKind.Call),
-    )
-    ReminderCategory.Appointment -> listOf(
-        DetailAction("Add to Calendar", ActionKind.Calendar),
-        DetailAction("Open Maps", ActionKind.Maps),
-        DetailAction("Call", ActionKind.Call),
-    )
-    ReminderCategory.Bill -> listOf(
-        DetailAction("Pay", ActionKind.Pay),
-        DetailAction("Add Reminder", ActionKind.Reminder),
-        DetailAction("View Bill", ActionKind.View),
-    )
-    ReminderCategory.Document -> listOf(
-        DetailAction("Add Reminder", ActionKind.Reminder),
-        DetailAction("Open Document", ActionKind.View),
-        DetailAction("Share", ActionKind.Share),
-    )
-    ReminderCategory.Delivery -> listOf(
-        DetailAction("Track", ActionKind.Track),
-        DetailAction("Open Address", ActionKind.Maps),
-        DetailAction("Add Reminder", ActionKind.Reminder),
-    )
-    ReminderCategory.Unknown -> listOf(
-        DetailAction("Add Reminder", ActionKind.Reminder),
-        DetailAction("Edit", ActionKind.Edit),
-        DetailAction("Delete", ActionKind.Delete),
-    )
-}
-
-private fun getSmartReminderSuggestions(category: ReminderCategory): List<String> = when (category) {
-    ReminderCategory.Travel -> listOf("Check-in opens", "Leave for airport", "Flight departure")
-    ReminderCategory.Hotel -> listOf("Prepare documents", "Check-in reminder", "Check-out reminder")
-    ReminderCategory.Appointment -> listOf("Reminder 1 day before", "Reminder 2 hours before", "Leave on time")
-    ReminderCategory.Bill -> listOf("Due soon", "Due tomorrow", "Due today")
-    ReminderCategory.Document -> listOf("Renew 6 months before", "Renew 3 months before", "Expiry warning")
-    ReminderCategory.Delivery -> listOf("Delivery expected", "Package arriving today", "Follow up if delayed")
-    ReminderCategory.Unknown -> listOf("Review reminder", "Act on time")
-}
-
-private fun getAISummaryText(category: ReminderCategory): String = when (category) {
-    ReminderCategory.Travel -> "Flight booking detected."
-    ReminderCategory.Hotel -> "Hotel reservation detected."
-    ReminderCategory.Appointment -> "Appointment detected."
-    ReminderCategory.Bill -> "Bill payment detected."
-    ReminderCategory.Document -> "Document expiry detected."
-    ReminderCategory.Delivery -> "Delivery notification detected."
-    ReminderCategory.Unknown -> "Reminder detected."
 }
 
 private fun Reminder.secondaryInformation(category: ReminderCategory): List<String> {
@@ -704,14 +638,6 @@ private fun Reminder.secondaryInformation(category: ReminderCategory): List<Stri
 
 private fun Reminder.mainDateText(): String =
     dateTime?.let { formatDate(it) } ?: "No date or time detected"
-
-private fun DetailAction.isAvailable(reminder: Reminder): Boolean = when (kind) {
-    ActionKind.Calendar -> reminder.dateTime != null
-    ActionKind.Maps -> reminder.location?.isNotBlank() == true
-    ActionKind.Share -> true
-    ActionKind.Delete -> true
-    else -> false
-}
 
 private fun formatDate(value: Long): String =
     DateFormat.getDateTimeInstance(DateFormat.FULL, DateFormat.SHORT).format(Date(value))

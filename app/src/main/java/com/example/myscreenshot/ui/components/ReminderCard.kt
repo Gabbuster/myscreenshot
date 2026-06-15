@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -31,6 +32,7 @@ import java.util.Date
 fun ReminderCard(
     reminder: Reminder,
     onClick: () -> Unit,
+    onTagClick: (Reminder) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val isPast = reminder.dateTime?.let { it < System.currentTimeMillis() } == true
@@ -81,12 +83,29 @@ fun ReminderCard(
             if (isPast) {
                 PassedStamp()
             } else {
-                SourceThumbnail(
-                    sourceType = reminder.sourceType,
-                    sourceUri = reminder.sourceImageUri,
-                    modifier = Modifier.size(56.dp),
-                )
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clickable { onTagClick(reminder) },
+                ) {
+                    SourceThumbnail(
+                        sourceType = reminder.sourceType,
+                        sourceUri = reminder.sourceImageUri,
+                        modifier = Modifier.size(56.dp),
+                    )
+                    reminder.tagColor?.toTagColor()?.let { color ->
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .size(width = 13.dp, height = 30.dp)
+                                .background(color, RoundedCornerShape(bottomStart = 7.dp, bottomEnd = 7.dp)),
+                        )
+                    }
+                }
             }
         }
     }
 }
+
+private fun String.toTagColor(): Color =
+    runCatching { Color(android.graphics.Color.parseColor(this)) }.getOrElse { Color(0xFFFF8A1F) }

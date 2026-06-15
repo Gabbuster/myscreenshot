@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
@@ -57,9 +59,10 @@ import com.example.myscreenshot.ocr.OcrProcessor
 import com.example.myscreenshot.ocr.SharedInput
 import com.example.myscreenshot.ui.components.ReminderTypeIcon
 import com.example.myscreenshot.ui.components.SourceThumbnail
+import com.example.myscreenshot.ui.tags.tagColorOptions
+import com.example.myscreenshot.ui.tags.toTagColor
 import com.example.myscreenshot.ui.theme.AppInk
 import com.example.myscreenshot.ui.theme.AppPaper
-import com.example.myscreenshot.ui.theme.AppProof
 import com.example.myscreenshot.ui.theme.AppSuccess
 import com.example.myscreenshot.ui.theme.MyScreenshotTheme
 import kotlinx.coroutines.launch
@@ -254,11 +257,11 @@ fun ReviewSaveContent(
                         Text("Review detected reminder", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                         Text(
                             if (ambiguousOptions.size > 1) {
-                                "AI found ${ambiguousOptions.size} possible matches"
+                                "Screen4U found ${ambiguousOptions.size} possible matches"
                             } else if (actionCount == 1) {
-                                "AI found 1 action"
+                                "Screen4U found 1 action"
                             } else {
-                                "AI found $actionCount actions"
+                                "Screen4U found $actionCount actions"
                             },
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -384,7 +387,7 @@ private fun LoadingResultCard() {
             CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Finding the reminder", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text("AI is looking for the action and date.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Screen4U is looking for the action and date.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -447,7 +450,7 @@ private fun PrimaryResultCard(
             action.location?.takeIf { it.isNotBlank() }?.let { FieldBlock(label = action.locationLabel(), value = it) }
         }
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("AI Summary", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("Screen4U summary", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(action.aiSummary(), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -702,13 +705,15 @@ private fun SavedReminderSheet(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var sheetReminder by remember(reminder.id) { mutableStateOf(reminder) }
     var alarmTitle by remember(reminder.id) { mutableStateOf(suggestedAlarmTitle(reminder)) }
     var alarmTime by remember(reminder.id) { mutableStateOf(suggestedAlarmTime(reminder)) }
     var statusText by remember { mutableStateOf<String?>(null) }
     var scheduling by remember { mutableStateOf(false) }
-    var calendarSelected by remember(reminder.id) { mutableStateOf(false) }
+    var calendarSelected by remember(reminder.id) { mutableStateOf(reminder.calendarSavedAt != null) }
     var alarmSelected by remember(reminder.id) { mutableStateOf(false) }
-    var alarmSaved by remember(reminder.id) { mutableStateOf(false) }
+    var alarmSaved by remember(reminder.id) { mutableStateOf(reminder.alarmSavedAt != null) }
+    var showTagEditor by remember(reminder.id) { mutableStateOf(false) }
     val canAddCalendar = reminder.dateTime != null
     val zoneId = ZoneId.systemDefault()
     val alarmDateTime = alarmTime.toLocalDateTime(zoneId)
@@ -716,8 +721,11 @@ private fun SavedReminderSheet(
         contract = ActivityResultContracts.StartActivityForResult(),
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
-            calendarSelected = true
-            statusText = "Calendar event saved"
+            scope.launch {
+                sheetReminder = repository.markCalendarSaved(sheetReminder)
+                calendarSelected = true
+                statusText = "Reminder saved in calendar"
+            }
         } else if (!calendarSelected) {
             statusText = "Finish the event in your calendar app to save it."
         }
@@ -739,10 +747,26 @@ private fun SavedReminderSheet(
                 maxLines = 2,
             )
 
+            if (sheetReminder.tagName != null) {
+                SuccessMention(
+                    text = "Tagged ${sheetReminder.tagName}",
+                    accent = (sheetReminder.tagColor ?: "#FF8A1F").toTagColor().copy(alpha = 0.14f),
+                )
+            } else {
+                OutlinedButton(
+                    onClick = { showTagEditor = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    contentPadding = PaddingValues(vertical = 13.dp),
+                ) {
+                    Text("Add a tag")
+                }
+            }
+
             if (calendarSelected) {
                 SuccessMention(
                     text = "Reminder saved in calendar",
-                    accent = MaterialTheme.colorScheme.primaryContainer,
+                    accent = AppSuccess.copy(alpha = 0.12f),
                 )
             } else {
                 QuestionToggleRow(
@@ -877,9 +901,10 @@ private fun SavedReminderSheet(
                                         alertLabel = alarmTitle,
                                     )
                                 }.onSuccess {
+                                    sheetReminder = repository.markAlarmSaved(sheetReminder)
                                     alarmSaved = true
                                     alarmSelected = false
-                                    statusText = "Phone alarm set"
+                                    statusText = "Reminder saved into Alarms"
                                 }.onFailure {
                                     statusText = "Could not set the phone reminder."
                                 }
@@ -913,6 +938,19 @@ private fun SavedReminderSheet(
                 Text("Done")
             }
         }
+    }
+
+    if (showTagEditor) {
+        SaveFlowTagDialog(
+            reminder = sheetReminder,
+            onDismiss = { showTagEditor = false },
+            onSave = { name, color ->
+                scope.launch {
+                    sheetReminder = repository.assignTag(sheetReminder, name, color)
+                    showTagEditor = false
+                }
+            },
+        )
     }
 }
 
@@ -1022,14 +1060,67 @@ private fun SuccessMention(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("Saved", color = MaterialTheme.colorScheme.onPrimaryContainer, style = MaterialTheme.typography.labelMedium)
+        Text("Saved", color = AppSuccess, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
         Text(
             text,
-            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            color = AppSuccess,
             style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
             maxLines = 2,
         )
     }
+}
+
+@Composable
+private fun SaveFlowTagDialog(
+    reminder: Reminder,
+    onDismiss: () -> Unit,
+    onSave: (String?, String?) -> Unit,
+) {
+    var tagName by remember(reminder.id) { mutableStateOf(reminder.tagName.orEmpty()) }
+    var tagColor by remember(reminder.id) { mutableStateOf(reminder.tagColor ?: tagColorOptions.first()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add a tag") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                TextField(
+                    value = tagName,
+                    onValueChange = { tagName = it },
+                    singleLine = true,
+                    label = { Text("Tag name") },
+                    placeholder = { Text("Trip to Porto") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    tagColorOptions.forEach { option ->
+                        Box(
+                            modifier = Modifier
+                                .size(if (option == tagColor) 38.dp else 32.dp)
+                                .background(option.toTagColor(), RoundedCornerShape(50))
+                                .border(
+                                    if (option == tagColor) 3.dp else 1.dp,
+                                    MaterialTheme.colorScheme.outline,
+                                    RoundedCornerShape(50),
+                                )
+                                .clickable { tagColor = option },
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onSave(tagName, tagColor) }) {
+                Text("Save tag")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+    )
 }
 
 private data class AlarmSuggestionOption(
@@ -1202,7 +1293,7 @@ private fun ReviewPreview() {
             sourceType = "image",
             sourceNote = "Image processed locally",
             sourceUri = null,
-            aiAssistNote = "On-device AI Assist used OCR and local language detection",
+            aiAssistNote = "Screen4U used OCR and local language detection",
             errorMessage = null,
             saving = false,
             detectedText = Samples.flightText,

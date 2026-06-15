@@ -36,8 +36,8 @@ class OnDeviceAiExtractor(
         )
         val note = when {
             actions.isEmpty() -> null
-            entities.isNotEmpty() -> "On-device AI Assist used OCR and local language detection"
-            else -> "On-device AI Assist used local screenshot rules"
+            entities.isNotEmpty() -> "Screen4U used OCR and local language detection"
+            else -> "Screen4U used local screenshot rules"
         }
         return OnDeviceAiResult(actions = actions, entities = entities, note = note)
     }

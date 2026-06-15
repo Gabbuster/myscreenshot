@@ -67,10 +67,10 @@ fun SettingsScreen(
         item {
             SettingsCard {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                    Text("On-device AI Assist")
+                    Text("Screen4U assist")
                     Switch(checked = true, onCheckedChange = {}, enabled = false)
                 }
-                Text("The app reads screenshots with device OCR and local entity detection. Users do not need API keys or accounts.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Screen4U reads screenshots with device OCR and local entity detection. Users do not need API keys or accounts.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         item {
@@ -95,13 +95,13 @@ fun SettingsScreen(
         }
         item {
             SettingsCard {
-                Text("AI Assist", fontWeight = FontWeight.SemiBold)
+                Text("Screen4U assist", fontWeight = FontWeight.SemiBold)
                 Text(
                     "Enabled on this device",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    "The assistant combines OCR, downloaded ML Kit language models, and strict local rules for flights, hotels, bills, deliveries, appointments, and documents.",
+                    "Screen4U combines OCR, downloaded ML Kit language models, and strict local rules for flights, hotels, bills, deliveries, appointments, and documents.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

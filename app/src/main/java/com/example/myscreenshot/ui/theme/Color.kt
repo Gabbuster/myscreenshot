@@ -2,24 +2,24 @@ package com.example.myscreenshot.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val AppInk = Color(0xFF11161F)
-val AppInkSoft = Color(0xFF29313D)
-val AppCanvas = Color(0xFFF3F0E8)
-val AppSurface = Color(0xFFF9F7F1)
-val AppSurfaceRaised = Color(0xFFFFFDF8)
-val AppMuted = Color(0xFF6E756F)
-val AppLine = Color(0xFFD9D2C4)
-val AppOrange = Color(0xFFF2A23A)
-val AppCoral = Color(0xFFC95C45)
-val AppPeach = Color(0xFFFFE7B6)
-val AppSuccess = Color(0xFF197A6B)
-val AppError = Color(0xFFB83A2E)
+val AppInk = Color(0xFF111111)
+val AppInkSoft = Color(0xFF2A2520)
+val AppCanvas = Color(0xFFFFF7ED)
+val AppSurface = Color(0xFFFFFBF6)
+val AppSurfaceRaised = Color(0xFFFFFFFF)
+val AppMuted = Color(0xFF766B61)
+val AppLine = Color(0xFFE8D8C7)
+val AppOrange = Color(0xFFFF8A1F)
+val AppCoral = Color(0xFFE85D2A)
+val AppPeach = Color(0xFFFFE1BF)
+val AppSuccess = Color(0xFF1B7A4D)
+val AppError = Color(0xFFB83224)
 
-val AppProof = Color(0xFF197A6B)
-val AppProofSoft = Color(0xFFDDEFEA)
-val AppPaper = Color(0xFFFFFDF8)
-val AppLedger = Color(0xFFE9E2D2)
-val AppScan = Color(0xFFFFC24A)
+val AppProof = AppOrange
+val AppProofSoft = AppPeach
+val AppPaper = AppSurfaceRaised
+val AppLedger = Color(0xFFFFECD8)
+val AppScan = Color(0xFFFFB347)
 
 val AppBlue = AppInk
 val AppDarkText = AppInk
