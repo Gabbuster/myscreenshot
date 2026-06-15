@@ -93,7 +93,7 @@ fun EmptyTagsCard() {
     ) {
         Text("No tags yet", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Text(
-            "Tap a reminder thumbnail to mark a trip, event, or project.",
+            "Tap the bookmark on a reminder thumbnail to mark a trip, event, or project.",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodyMedium,
         )

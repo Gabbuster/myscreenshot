@@ -48,7 +48,10 @@ fun ReminderCard(
             .padding(16.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            ReminderTypeIcon(reminder.type)
+            ReminderThumbnailWithBookmark(
+                reminder = reminder,
+                onTagClick = onTagClick,
+            )
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text(
@@ -83,28 +86,57 @@ fun ReminderCard(
             }
             if (isPast) {
                 PassedStamp()
-            } else {
-                Box(
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clickable { onTagClick(reminder) },
-                ) {
-                    SourceThumbnail(
-                        sourceType = reminder.sourceType,
-                        sourceUri = reminder.sourceImageUri,
-                        modifier = Modifier.size(64.dp),
-                    )
-                    reminder.tagColor?.toTagColor()?.let { color ->
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .size(width = 12.dp, height = 34.dp)
-                                .background(color, RoundedCornerShape(bottomStart = 6.dp, bottomEnd = 6.dp))
-                                .border(1.dp, Color.White.copy(alpha = 0.82f), RoundedCornerShape(bottomStart = 6.dp, bottomEnd = 6.dp)),
-                        )
-                    }
-                }
             }
         }
+    }
+}
+
+@Composable
+private fun ReminderThumbnailWithBookmark(
+    reminder: Reminder,
+    onTagClick: (Reminder) -> Unit,
+) {
+    Box(modifier = Modifier.size(72.dp)) {
+        SourceThumbnail(
+            sourceType = reminder.sourceType,
+            sourceUri = reminder.sourceImageUri,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .size(64.dp),
+        )
+        BookmarkButton(
+            tagColor = reminder.tagColor,
+            onClick = { onTagClick(reminder) },
+            modifier = Modifier.align(Alignment.TopStart),
+        )
+    }
+}
+
+@Composable
+private fun BookmarkButton(
+    tagColor: String?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val color = tagColor?.toTagColor() ?: MaterialTheme.colorScheme.primary
+    Box(
+        modifier = modifier
+            .size(48.dp)
+            .clickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(width = 20.dp, height = 42.dp)
+                .background(
+                    color = if (tagColor == null) MaterialTheme.colorScheme.surface else color,
+                    shape = RoundedCornerShape(bottomStart = 7.dp, bottomEnd = 7.dp),
+                )
+                .border(
+                    width = 2.dp,
+                    color = color,
+                    shape = RoundedCornerShape(bottomStart = 7.dp, bottomEnd = 7.dp),
+                ),
+        )
     }
 }
